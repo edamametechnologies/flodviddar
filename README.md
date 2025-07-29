@@ -5,7 +5,7 @@ Flodviddar is an open-source security tool, specifically designed to monitor, de
 
 It uses the Flodbadd library for packet inspection, enabling it to:
 
-- Enforce strict traffic whitelists to ensure only known and approved outbound communications.
+- Enforce strict traffic whitelists to ensure only known and approved outbound communications defined with l3 to l7 criteria.
 
 - Block threats using regularly updated blacklists to quickly respond to known malicious hosts and domains.
 
