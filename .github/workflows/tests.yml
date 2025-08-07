@@ -103,6 +103,8 @@ jobs:
 
   test_halt:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
