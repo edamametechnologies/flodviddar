@@ -7,14 +7,15 @@ on:
 jobs:
   create_whitelist:
     runs-on: ubuntu-latest
+
     steps:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
 
-      - name: Install dependencies
+      - name: Install dependencies (pcap + tmux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpcap-dev
+          sudo apt-get install -y libpcap-dev tmux
 
       - name: 📦 Checkout code
         uses: actions/checkout@v3
@@ -52,29 +53,35 @@ jobs:
       - name: 🐍 Install Python deps
         run: pip install requests
 
-      - name: 🎯 Generate the custom whitelist
+      - name: 🎯 Generate the custom whitelist via tmux
         run: |
-          # 1) Launch your `create-whitelist` listener in the background for 120 s
-          nohup cargo run --release create-whitelist 120 \
-            --file runner-ubuntu-whitelist.json \
-            > whitelist.log 2>&1 &
+          # 1) Start listener in a detached tmux session for 120 s
+          tmux new-session -d -s whitelist \
+            "cargo run --release create-whitelist 120 --file runner-ubuntu-whitelist.json"
 
-          # 2) Give the listener a moment to bind its socket
+          # 2) Give it a moment to bind its socket
           sleep 5
 
           # 3) Run your “legitimate” build to produce baseline traffic
           python build.py
 
-          # 4) Allow the rest of the 120 s capture window to elapse
+          # 4) Wait out the full 120 s capture window
           echo "Waiting for listener to finish capturing (up to 120 s total)…"
           sleep 120
 
-          # 5) Wait for the background process to exit cleanly
-          wait
+          # 5) (optional) grab tmux output for debugging
+          tmux capture-pane -pt whitelist > listener.log
 
-      - name: 📄 Show generated whitelist
-        run: cat runner-ubuntu-whitelist.json
+          # 6) Tear down the tmux session
+          tmux kill-session -t whitelist || true
 
+      - name: 📄 Show generated whitelist & listener log
+        run: |
+          echo "=== runner-ubuntu-whitelist.json ==="
+          cat runner-ubuntu-whitelist.json || echo "(empty)"
+          echo
+          echo "=== listener.log ==="
+          cat listener.log || echo "(no logs)"
       # - name: 🐍 Create malicious build script
       #   run: |
       #     cat > build_malicious.py << 'EOF'
