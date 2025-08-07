@@ -26,8 +26,7 @@ jobs:
           python-version: "3.10"
 
       - name: ⚙️ Build your release binary
-        run: |
-          cargo build --release
+        run: cargo build --release
 
       - name: ✍️ Create legitimate build script
         run: |
@@ -55,33 +54,35 @@ jobs:
 
       - name: 🎯 Generate the custom whitelist via tmux
         run: |
-          # 1) Start listener in a detached tmux session for 120 s
-          tmux new-session -d -s whitelist \
-            "cargo run --release create-whitelist 120 --file runner-ubuntu-whitelist.json"
+          # 1) Kill any prior session so we start clean
+          tmux kill-session -t whitelist 2>/dev/null || true
 
-          # 2) Give it a moment to bind its socket
+          # 2) Spawn listener in a detached tmux session for 120 s
+          tmux new-session -d -s whitelist \
+            "bash -lc 'cargo run --release -- create-whitelist 120 \
+              --file runner-ubuntu-whitelist.json > whitelist.log 2>&1'"
+
+          # 3) Give it a moment to bind its capture socket
           sleep 5
 
-          # 3) Run your “legitimate” build to produce baseline traffic
+          # 4) Run your “legitimate” build to produce baseline traffic
           python build.py
 
-          # 4) Wait out the full 120 s capture window
-          echo "Waiting for listener to finish capturing (up to 120 s total)…"
-          sleep 120
+          # 5) Wait until the listener’s session dies (i.e. 120 s have passed)
+          echo "Waiting for listener to finish capturing (up to 120 s)…"
+          timeout 130 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done'
 
-          # 5) (optional) grab tmux output for debugging
-          tmux capture-pane -pt whitelist > listener.log
-
-          # 6) Tear down the tmux session
-          tmux kill-session -t whitelist || true
+          # 6) Clean up the tmux session (if it's still around)
+          tmux kill-session -t whitelist 2>/dev/null || true
 
       - name: 📄 Show generated whitelist & listener log
         run: |
           echo "=== runner-ubuntu-whitelist.json ==="
           cat runner-ubuntu-whitelist.json || echo "(empty)"
           echo
-          echo "=== listener.log ==="
-          cat listener.log || echo "(no logs)"
+          echo "=== whitelist.log ==="
+          cat whitelist.log || echo "(no logs)"
+
       # - name: 🐍 Create malicious build script
       #   run: |
       #     cat > build_malicious.py << 'EOF'
@@ -99,3 +100,20 @@ jobs:
 
       # - name: 🏴‍☠️ Run malicious build script
       #   run: python build_malicious.py
+
+  test_halt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install dependencies (pcap + tmux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev tmux
+
+      - name: 📦 Checkout code
+        uses: actions/checkout@v3
+      - name: ⚙️ Build your release binary
+        run: |
+          cargo run --release halt "Build blocked by security policy"
