@@ -8,9 +8,6 @@ jobs:
   create_whitelist:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
 
@@ -18,9 +15,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpcap-dev
-
-      - name: Run the binary to create the whitelist
-        run: cargo run --release create-whitelist 120 --file runner-ubuntu-whitelist.json
 
       - name: 📦 Checkout code
         uses: actions/checkout@v3
@@ -30,13 +24,33 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: 🔧 Install Python deps
-        run: |
-          pip install requests
-
       - name: ⚙️ Build your release binary
         run: |
           cargo build --release
+
+      - name: ✍️ Create legitimate build script
+        run: |
+          cat > build.py << 'EOF'
+          import subprocess
+          import sys
+          import requests
+
+          # Print Python version (legitimate action)
+          print(f"Python version: {sys.version}")
+
+          # Download a legitimate dependency (from PyPI)
+          print("Downloading requests library info from PyPI...")
+          response = requests.get("https://pypi.org/pypi/requests/json")
+          print(f"Downloaded PyPI info: {response.status_code}")
+
+          # Run pip list (legitimate action)
+          subprocess.run(["pip", "list"])
+
+          print("Build completed successfully!")
+          EOF
+
+      - name: 🐍 Install Python deps
+        run: pip install requests
 
       - name: 🎯 Generate the custom whitelist
         run: |
