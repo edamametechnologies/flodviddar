@@ -126,7 +126,7 @@ jobs:
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
-          python build.py
+          python build_malicious.py
 
       - name: 📄 Show generated whitelist & listener log
         run: |
