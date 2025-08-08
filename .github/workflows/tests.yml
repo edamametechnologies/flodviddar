@@ -79,7 +79,6 @@ jobs:
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
           python build.py
-          ping -w 15 google.com || true
 
           # 4) Wait for capture to finish
           echo "Waiting for listener to finish (up to 120s + grace)…"
