@@ -104,6 +104,9 @@ jobs:
 
   test_halt:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
