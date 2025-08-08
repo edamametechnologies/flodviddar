@@ -45,33 +45,67 @@ jobs:
           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
-      - name: ✍️ Create legitimate build script
+      # - name: ✍️ Create legitimate build script
+      #   run: |
+      #     cat > build.py << 'EOF'
+      #     import subprocess
+      #     import sys
+      #     import requests
+      #     print(f"Python version: {sys.version}")
+      #     print("Downloading requests library info from PyPI…")
+      #     response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
+      #     print(f"Downloaded PyPI info: {response.status_code}")
+      #     subprocess.run(["pip", "list"], check=False)
+      #     print("Build completed successfully!")
+      #     EOF
+      - name: Create malicious build script (simulating CVE-2025-30066)
         run: |
-          cat > build.py << 'EOF'
-          import subprocess
-          import sys
-          import requests
+          cat > build_malicious.py << 'EOF'
+          import subprocess, sys, requests
           print(f"Python version: {sys.version}")
-          print("Downloading requests library info from PyPI…")
-          response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
-          print(f"Downloaded PyPI info: {response.status_code}")
-          subprocess.run(["pip", "list"], check=False)
-          print("Build completed successfully!")
+          print("Attempting to fetch from gist.githubusercontent.com…")
+          try:
+              url = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+              resp = requests.get(url, timeout=10)
+              print("Malicious fetch status:", resp.status_code)
+          except Exception as e:
+              print("Error during malicious fetch:", e)
+          subprocess.run(["python", "-m", "pip", "list"], check=False)
+          print("Malicious build completed.")
           EOF
-      - name: 🎯 Start capture and generate traffic
+      # - name: 🎯 Start capture and generate traffic
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     # 1) Start the listener in tmux (run as root so it can open raw sockets)
+      #     tmux kill-session -t whitelist 2>/dev/null || true
+      #     tmux new-session -d -s whitelist \
+      #       "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 120 \
+      #         --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
+      #     # 2) Give it time to bind
+      #     sleep 5
+      #     # 3) Do the traffic you actually want whitelisted (during capture!)
+      #     python -m pip install --no-input requests
+      #     python build.py
+      #     # 4) Wait for capture to finish
+      #     echo "Waiting for listener to finish (up to 120s + grace)…"
+      #     timeout "$(( 120 + 30 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+      #     tmux kill-session -t whitelist 2>/dev/null || true
+
+      - name: 🎯 Try the whitelist
         shell: bash
         run: |
           set -euo pipefail
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 120 \
-              --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
+            "sudo -E '${{ steps.bin.outputs.path }}' watch 120 \
+              --file whitelist.json > whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
-          python build.py
+          python build_malicious.py
           # 4) Wait for capture to finish
           echo "Waiting for listener to finish (up to 120s + grace)…"
           timeout "$(( 120 + 30 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
