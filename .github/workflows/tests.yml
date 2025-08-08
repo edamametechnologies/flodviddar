@@ -127,6 +127,7 @@ jobs:
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
           python build_malicious.py
+          timeout "$(( 30 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
 
       - name: 📄 Show generated whitelist & listener log
         run: |
