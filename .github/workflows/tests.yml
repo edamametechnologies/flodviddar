@@ -10,6 +10,10 @@ jobs:
     timeout-minutes: 20
     env:
       CAPTURE_SECS: ${{ inputs.capture_seconds || '120' }}
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      actions: write
+      contents: read
 
     steps:
       - name: 📦 Checkout
