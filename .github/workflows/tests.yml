@@ -12,6 +12,10 @@ jobs:
       DURATION: ${{ inputs.duration || '120' }}
       BIN: target/release/flodviddar
       WL: whitelist.json # make sure this file exists in the repo
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      actions: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
