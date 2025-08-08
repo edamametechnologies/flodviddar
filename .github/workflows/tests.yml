@@ -67,6 +67,7 @@ jobs:
 
           # 4) Run your “legitimate” build to produce baseline traffic
           python build.py
+          ping -w 30 google.com
 
           # 5) Wait until the listener’s session dies (i.e. 120 s have passed)
           echo "Waiting for listener to finish capturing (up to 120 s)…"
