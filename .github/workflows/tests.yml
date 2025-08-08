@@ -5,134 +5,81 @@ on:
     branches: ["*"]
 
 jobs:
-  enforce:
+  create_whitelist:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DURATION: ${{ inputs.duration || '120' }}
-      BIN: target/release/flodviddar
-      WL: whitelist.json # make sure this file exists in the repo
-      GH_TOKEN: ${{ github.token }}
-    permissions:
-      actions: write
-      contents: read
+      CAPTURE_SECS: ${{ inputs.capture_seconds || '120' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - name: 🦀 Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
 
-      - name: System deps (pcap)
+      - name: 🧰 System deps (pcap, tmux, jq)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpcap-dev
-
-      - name: Build watcher binary
-        run: cargo build --release
-
-      - name: Create legitimate build script
-        run: |
-          cat > build.py << 'EOF'
-          import subprocess, sys, requests
-          print(f"Python version: {sys.version}")
-          print("Downloading requests metadata from PyPI…")
-          r = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
-          print("Status:", r.status_code)
-          subprocess.run(["python", "-m", "pip", "list"], check=False)
-          print("Legit build completed.")
-          EOF
-
-      - name: Create malicious build script (simulating CVE-2025-30066)
-        run: |
-          cat > build_malicious.py << 'EOF'
-          import subprocess, sys, requests
-          print(f"Python version: {sys.version}")
-          print("Attempting to fetch from gist.githubusercontent.com…")
-          try:
-              url = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
-              resp = requests.get(url, timeout=10)
-              print("Malicious fetch status:", resp.status_code)
-          except Exception as e:
-              print("Error during malicious fetch:", e)
-          subprocess.run(["python", "-m", "pip", "list"], check=False)
-          print("Malicious build completed.")
-          EOF
-
-      - name: Set up Python
+          sudo apt-get install -y libpcap-dev tmux jq
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Run workload under watcher (auto-fails on violation)
+      - name: ⚙️ Build sniffer (release)
+        run: cargo build --release
+
+      - name: 🔎 Find built binary path
+        id: bin
         shell: bash
         run: |
           set -euo pipefail
-          [[ -f "$WL" ]] || { echo "::error file=$WL::Whitelist file not found"; exit 1; }
-
-          # Start watcher (no API cancel; it exits non-zero on violation)
-          "$BIN" watch "$DURATION" --custom-whitelist "$WL" --no-cancel > watch.log 2>&1 & WATCH=$!
-
-          # Start the "build" workload
-          (
-            python -m pip install --no-input requests
-            python build.py
-            python build_malicious.py
-          ) & TASKS=$!
-
-          # Wait for whichever finishes first, then act accordingly
-          set +e
-          wait -n "$WATCH" "$TASKS"
-          first_status=$?
-          set -e
-
-          if ps -p "$WATCH" > /dev/null; then
-            echo "✅ Workload finished before watcher; stopping watcher."
-            kill -TERM "$WATCH" 2>/dev/null || true
-            wait "$WATCH" || true
-          else
-            echo "❌ Watcher exited early — likely off-whitelist egress detected."
-            # Stop workload quickly and fail the job
-            kill -TERM "$TASKS" 2>/dev/null || true
-            sleep 1
-            kill -KILL "$TASKS" 2>/dev/null || true
-            echo "---- watch.log (last 100 lines) ----"
-            tail -n 100 watch.log || true
+          meta_json="$(cargo metadata --no-deps --format-version=1)"
+          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+          if [[ -z "$bin_name" ]]; then
+            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
             exit 1
           fi
-
-      - name: Step summary
-        if: always()
+          bin_path="target/release/$bin_name"
+          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+      - name: ✍️ Create legitimate build script
         run: |
-          {
-            echo "## Whitelist enforcement run"
-            echo "- Duration: $DURATION s"
-            echo "- Whitelist: \`$WL\`"
-            echo ""
-            echo "<details><summary>watch.log (tail)</summary>"
-            echo
-            (test -f watch.log && tail -n 100 watch.log) || echo "(no watch.log)"
-            echo
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-    # test_halt:
-    #   runs-on: ubuntu-latest
-    #   permissions:
-    #     actions: write
-    #     contents: read
-    #   env:
-    #     GH_TOKEN: ${{ github.token }}
-    #   steps:
-    #     - name: Install Rust toolchain
-    #       uses: dtolnay/rust-toolchain@nightly
-
-    #     - name: Install dependencies (pcap + tmux)
-    #       run: |
-    #         sudo apt-get update
-    #         sudo apt-get install -y libpcap-dev tmux
-
-    #     - name: 📦 Checkout code
-    #       uses: actions/checkout@v3
-    #     - name: ⚙️ Build your release binary
-    #       run: |
-    #         cargo run --release halt "Build blocked by security policy"
+          cat > build.py << 'EOF'
+          import subprocess
+          import sys
+          import requests
+          print(f"Python version: {sys.version}")
+          print("Downloading requests library info from PyPI…")
+          response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
+          print(f"Downloaded PyPI info: {response.status_code}")
+          subprocess.run(["pip", "list"], check=False)
+          print("Build completed successfully!")
+          EOF
+      - name: 🎯 Start capture and generate traffic
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 1) Start the listener in tmux (run as root so it can open raw sockets)
+          tmux kill-session -t whitelist 2>/dev/null || true
+          tmux new-session -d -s whitelist \
+            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 120 \
+              --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
+          # 2) Give it time to bind
+          sleep 5
+          # 3) Do the traffic you actually want whitelisted (during capture!)
+          python -m pip install --no-input requests
+          python build.py
+          # 4) Wait for capture to finish
+          echo "Waiting for listener to finish (up to 120s + grace)…"
+          timeout "$(( 120 + 30 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          tmux kill-session -t whitelist 2>/dev/null || true
+      - name: 📄 Show generated whitelist & listener log
+        run: |
+          echo "=== runner-ubuntu-whitelist.json ==="
+          test -f runner-ubuntu-whitelist.json && cat runner-ubuntu-whitelist.json || echo "(not created)"
+          echo
+          echo "=== whitelist.log ==="
+          test -f whitelist.log && tail -n +1 whitelist.log || echo "(no logs)"
