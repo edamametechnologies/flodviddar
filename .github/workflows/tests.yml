@@ -83,7 +83,7 @@ jobs:
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 30 \
+            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 5 \
               --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
