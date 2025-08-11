@@ -48,34 +48,163 @@ jobs:
           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
-      - name: ✍️ Create legitimate build script
+      # - name: ✍️ Create legitimate build script
+      #   run: |
+      #     cat > build.py << 'EOF'
+      #     import subprocess
+      #     import sys
+      #     import requests
+      #     print(f"Python version: {sys.version}")
+      #     print("Downloading requests library info from PyPI…")
+      #     response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
+      #     print(f"Downloaded PyPI info: {response.status_code}")
+      #     subprocess.run(["pip", "list"], check=False)
+      #     print("Build completed successfully!")
+      #     EOF
+      # - name: Create malicious build script (simulating CVE-2025-30066)
+      #   run: |
+      #     cat > build_malicious.py << 'EOF'
+      #     import subprocess, sys, requests
+      #     print(f"Python version: {sys.version}")
+      #     print("Attempting to fetch from gist.githubusercontent.com…")
+      #     try:
+      #         url = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+      #         resp = requests.get(url, timeout=10)
+      #         print("Malicious fetch status:", resp.status_code)
+      #     except Exception as e:
+      #         print("Error during malicious fetch:", e)
+      #     subprocess.run(["python", "-m", "pip", "list"], check=False)
+      #     print("Malicious build completed.")
+      #     EOF
+
+      - name: ✅ Build (whitelist PyPI packages)
         run: |
-          cat > build.py << 'EOF'
-          import subprocess
-          import sys
-          import requests
-          print(f"Python version: {sys.version}")
-          print("Downloading requests library info from PyPI…")
-          response = requests.get("https://pypi.org/pypi/requests/json", timeout=10)
-          print(f"Downloaded PyPI info: {response.status_code}")
-          subprocess.run(["pip", "list"], check=False)
-          print("Build completed successfully!")
+          cat > build_ok.py << 'EOF'
+          import json, time, sys, hashlib, tempfile, os, gzip, shutil
+          from urllib.request import urlopen, Request
+
+          OK_URLS = [
+              "https://pypi.org/pypi/requests/json",   # package 1
+              "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
+          ]
+
+          def fetch(url, timeout=10):
+              print(f"[net] GET {url}", flush=True)
+              with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
+                  data = r.read()
+              print(f"[net] {url} -> {len(data)} bytes", flush=True)
+              try:
+                  info = json.loads(data).get("info", {})
+                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+              except Exception:
+                  print(f"[net] non-JSON payload", flush=True)
+
+          def make_artifact(size_mb=8):
+              with tempfile.TemporaryDirectory() as td:
+                  raw = os.path.join(td, "blob.bin")
+                  gz  = raw + ".gz"
+                  with open(raw, "wb") as f:
+                      for _ in range(size_mb):
+                          f.write(os.urandom(1024*1024))
+                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+                      shutil.copyfileobj(src, dst)
+                  h = hashlib.sha256()
+                  with open(gz, "rb") as f:
+                      for chunk in iter(lambda: f.read(1024*1024), b""):
+                          h.update(chunk)
+                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+
+          def main():
+              print(f"[env] Python {sys.version.split()[0]}", flush=True)
+              start = time.monotonic()
+
+              for url in OK_URLS:
+                  fetch(url)
+
+              make_artifact(size_mb=8)
+
+              # Ensure total runtime >= 30s
+              while True:
+                  elapsed = int(time.monotonic() - start)
+                  if elapsed >= 30:
+                      break
+                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+                  time.sleep(1)
+
+              print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
+
+          if __name__ == "__main__":
+              main()
           EOF
-      - name: Create malicious build script (simulating CVE-2025-30066)
+
+          python build_ok.py
+
+      - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
         run: |
-          cat > build_malicious.py << 'EOF'
-          import subprocess, sys, requests
-          print(f"Python version: {sys.version}")
-          print("Attempting to fetch from gist.githubusercontent.com…")
-          try:
-              url = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
-              resp = requests.get(url, timeout=10)
-              print("Malicious fetch status:", resp.status_code)
-          except Exception as e:
-              print("Error during malicious fetch:", e)
-          subprocess.run(["python", "-m", "pip", "list"], check=False)
-          print("Malicious build completed.")
+          cat > build_violation.py << 'EOF'
+          import json, time, sys, hashlib, tempfile, os, gzip, shutil
+          from urllib.request import urlopen, Request
+
+          OK_URLS = [
+              "https://pypi.org/pypi/requests/json",   # package 1
+              "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
+          ]
+
+          # This is the extra, out-of-whitelist URL you asked to include
+          GIST_URL = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+
+          def fetch(url, timeout=10):
+              print(f"[net] GET {url}", flush=True)
+              with urlopen(Request(url, headers={"User-Agent":"violation-demo"}), timeout=timeout) as r:
+                  data = r.read()
+              print(f"[net] {url} -> {len(data)} bytes", flush=True)
+              try:
+                  info = json.loads(data).get("info", {})
+                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+              except Exception:
+                  print(f"[net] non-JSON payload", flush=True)
+
+          def make_artifact(size_mb=8):
+              with tempfile.TemporaryDirectory() as td:
+                  raw = os.path.join(td, "blob.bin")
+                  gz  = raw + ".gz"
+                  with open(raw, "wb") as f:
+                      for _ in range(size_mb):
+                          f.write(os.urandom(1024*1024))
+                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+                      shutil.copyfileobj(src, dst)
+                  h = hashlib.sha256()
+                  with open(gz, "rb") as f:
+                      for chunk in iter(lambda: f.read(1024*1024), b""):
+                          h.update(chunk)
+                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+
+          def main():
+              print(f"[env] Python {sys.version.split()[0]}", flush=True)
+              start = time.monotonic()
+
+              for url in OK_URLS:
+                  fetch(url)
+
+              # >>> This extra call should trigger your interceptor <<<
+              fetch(GIST_URL)
+
+              make_artifact(size_mb=8)
+
+              # Ensure total runtime >= 30s
+              while True:
+                  elapsed = int(time.monotonic() - start)
+                  if elapsed >= 30:
+                      break
+                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+                  time.sleep(1)
+
+              print(f"[done] Violation build finished in {time.monotonic()-start:.1f}s", flush=True)
+
+          if __name__ == "__main__":
+              main()
           EOF
+
       - name: 🎯 Start capture and generate traffic
         shell: bash
         run: |
@@ -83,13 +212,13 @@ jobs:
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 5 \
+            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 15 \
               --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
           python -m pip install --no-input requests
-          python build.py
+          python build_ok.py
           # 4) Wait for capture to finish
           echo "Waiting for listener to finish (up to 5s + grace)…"
           timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
@@ -127,7 +256,7 @@ jobs:
       #     sleep 5
       #     # 3) Do the traffic you actually want whitelisted (during capture!)
       #     python -m pip install --no-input requests
-      #     python build.py
+      #     python build_violation.py
       #     timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
 
       - name: 📄 Show generated whitelist & listener log
