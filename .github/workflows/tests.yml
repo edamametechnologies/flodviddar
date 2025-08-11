@@ -33,6 +33,7 @@ jobs:
       - name: ⚙️ Build sniffer (release)
         run: cargo build --release
 
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
       - name: 🔎 Find built binary path
         id: bin
         shell: bash
@@ -48,6 +49,10 @@ jobs:
           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+
+      # This action should be the first step of your job, and should be loaded on every separate job.
+      # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
+
       # - name: ✍️ Create legitimate build script
       #   run: |
       #     cat > build.py << 'EOF'
@@ -137,81 +142,81 @@ jobs:
               main()
           EOF
 
-      - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
-        run: |
-          cat > build_violation.py << 'EOF'
-          import json, time, sys, hashlib, tempfile, os, gzip, shutil
-          from urllib.request import urlopen, Request
+      # - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
+      #   run: |
+      #     cat > build_violation.py << 'EOF'
+      #     import json, time, sys, hashlib, tempfile, os, gzip, shutil
+      #     from urllib.request import urlopen, Request
 
-          OK_URLS = [
-              "https://pypi.org/pypi/requests/json",   # package 1
-              "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
-          ]
+      #     OK_URLS = [
+      #         "https://pypi.org/pypi/requests/json",   # package 1
+      #         "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
+      #     ]
 
-          # This is the extra, out-of-whitelist URL you asked to include
-          GIST_URL = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+      #     # This is the extra, out-of-whitelist URL you asked to include
+      #     GIST_URL = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
 
-          def fetch(url, timeout=10):
-              print(f"[net] GET {url}", flush=True)
-              with urlopen(Request(url, headers={"User-Agent":"violation-demo"}), timeout=timeout) as r:
-                  data = r.read()
-              print(f"[net] {url} -> {len(data)} bytes", flush=True)
-              try:
-                  info = json.loads(data).get("info", {})
-                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
-              except Exception:
-                  print(f"[net] non-JSON payload", flush=True)
+      #     def fetch(url, timeout=10):
+      #         print(f"[net] GET {url}", flush=True)
+      #         with urlopen(Request(url, headers={"User-Agent":"violation-demo"}), timeout=timeout) as r:
+      #             data = r.read()
+      #         print(f"[net] {url} -> {len(data)} bytes", flush=True)
+      #         try:
+      #             info = json.loads(data).get("info", {})
+      #             print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+      #         except Exception:
+      #             print(f"[net] non-JSON payload", flush=True)
 
-          def make_artifact(size_mb=8):
-              with tempfile.TemporaryDirectory() as td:
-                  raw = os.path.join(td, "blob.bin")
-                  gz  = raw + ".gz"
-                  with open(raw, "wb") as f:
-                      for _ in range(size_mb):
-                          f.write(os.urandom(1024*1024))
-                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
-                      shutil.copyfileobj(src, dst)
-                  h = hashlib.sha256()
-                  with open(gz, "rb") as f:
-                      for chunk in iter(lambda: f.read(1024*1024), b""):
-                          h.update(chunk)
-                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+      #     def make_artifact(size_mb=8):
+      #         with tempfile.TemporaryDirectory() as td:
+      #             raw = os.path.join(td, "blob.bin")
+      #             gz  = raw + ".gz"
+      #             with open(raw, "wb") as f:
+      #                 for _ in range(size_mb):
+      #                     f.write(os.urandom(1024*1024))
+      #             with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+      #                 shutil.copyfileobj(src, dst)
+      #             h = hashlib.sha256()
+      #             with open(gz, "rb") as f:
+      #                 for chunk in iter(lambda: f.read(1024*1024), b""):
+      #                     h.update(chunk)
+      #             print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
 
-          def main():
-              print(f"[env] Python {sys.version.split()[0]}", flush=True)
-              start = time.monotonic()
+      #     def main():
+      #         print(f"[env] Python {sys.version.split()[0]}", flush=True)
+      #         start = time.monotonic()
 
-              for url in OK_URLS:
-                  fetch(url)
+      #         for url in OK_URLS:
+      #             fetch(url)
 
-              # >>> This extra call should trigger your interceptor <<<
-              fetch(GIST_URL)
+      #         # >>> This extra call should trigger your interceptor <<<
+      #         fetch(GIST_URL)
 
-              make_artifact(size_mb=8)
+      #         make_artifact(size_mb=8)
 
-              # Ensure total runtime >= 30s
-              while True:
-                  elapsed = int(time.monotonic() - start)
-                  if elapsed >= 30:
-                      break
-                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
-                  time.sleep(1)
+      #         # Ensure total runtime >= 30s
+      #         while True:
+      #             elapsed = int(time.monotonic() - start)
+      #             if elapsed >= 30:
+      #                 break
+      #             print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+      #             time.sleep(1)
 
-              print(f"[done] Violation build finished in {time.monotonic()-start:.1f}s", flush=True)
+      #         print(f"[done] Violation build finished in {time.monotonic()-start:.1f}s", flush=True)
 
-          if __name__ == "__main__":
-              main()
-          EOF
+      #     if __name__ == "__main__":
+      #         main()
+      #     EOF
 
-      - name: 🎯 Start capture and generate traffic
+      - name: 🎯 Start capture and generate traffic to create the whitelist
         shell: bash
         run: |
           set -euo pipefail
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 15 \
-              --file runner-ubuntu-whitelist.json > whitelist.log 2>&1"
+            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 40 \
+              --file new-whitelist.json > whitelist-entry.log 2>&1"
           # 2) Give it time to bind
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
@@ -219,8 +224,19 @@ jobs:
           python build_ok.py
           # 4) Wait for capture to finish
           echo "Waiting for listener to finish (up to 5s + grace)…"
-          timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
           tmux kill-session -t whitelist 2>/dev/null || true
+
+      - name: 📄 Show generated whitelist & listener log
+        run: |
+          echo "=== new-whitelist.json === "
+          test -f new-whitelist.json && cat new-whitelist.json || echo "(not created)"
+          echo
+          echo "=== whitelist.log ==="
+          test -f whitelist.log && tail -n +1 whitelist.log || echo "(no logs)"
+
+      # - name: merge_whitelist
+      #   run: |
 
       # - name: 🎯 Try the whitelist TOTO
       #   shell: bash
@@ -256,14 +272,6 @@ jobs:
       #     python -m pip install --no-input requests
       #     python build_ok.py
       #     timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-
-      - name: 📄 Show generated whitelist & listener log
-        run: |
-          echo "=== runner-ubuntu-whitelist.json === "
-          test -f runner-ubuntu-whitelist.json && cat runner-ubuntu-whitelist.json || echo "(not created)"
-          echo
-          echo "=== whitelist.log ==="
-          test -f whitelist.log && tail -n +1 whitelist.log || echo "(no logs)"
 
   # test-cancel:
   #   runs-on: ubuntu-latest
