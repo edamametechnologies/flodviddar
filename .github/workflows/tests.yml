@@ -259,7 +259,7 @@ jobs:
 
       - name: 📄 Show generated whitelist & listener log
         run: |
-          echo "=== runner-ubuntu-whitelist.json ==="
+          echo "=== runner-ubuntu-whitelist.json === "
           test -f runner-ubuntu-whitelist.json && cat runner-ubuntu-whitelist.json || echo "(not created)"
           echo
           echo "=== whitelist.log ==="
