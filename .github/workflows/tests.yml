@@ -33,7 +33,14 @@ jobs:
       - name: ⚙️ Build sniffer (release)
         run: cargo build --release
 
-      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        with:
+          # This is the path to the binary you want to intercept
+          # It will be used by the action to intercept network requests
+          egress-policy: block
+          allowed-domains: |
+            raw.githubusercontent.com
+
       - name: 🔎 Find built binary paths
         id: bin
         shell: bash
