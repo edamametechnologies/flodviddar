@@ -137,8 +137,6 @@ jobs:
               main()
           EOF
 
-          python build_ok.py
-
       - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
         run: |
           cat > build_violation.py << 'EOF'
