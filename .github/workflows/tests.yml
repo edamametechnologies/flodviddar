@@ -128,12 +128,12 @@ jobs:
 
               make_artifact(size_mb=8)
 
-              # Ensure total runtime >= 60s
+              # Ensure total runtime >= 360s
               while True:
                   elapsed = int(time.monotonic() - start)
-                  if elapsed >= 60:
+                  if elapsed >= 360:
                       break
-                  print(f"[wait] {elapsed}s elapsed, {60-elapsed}s remaining…", flush=True)
+                  print(f"[wait] {elapsed}s elapsed, {360-elapsed}s remaining…", flush=True)
                   time.sleep(1)
 
               print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
