@@ -1,0 +1,190 @@
+name: Test of the project
+
+on:
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  create_whitelist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🦀 Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: 🧰 System deps (pcap, tmux, jq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev tmux jq
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: ⚙️ Build sniffer (release)
+        run: cargo build --release
+
+      - name: 🔎 Find built binary paths
+        id: bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta_json="$(cargo metadata --no-deps --format-version=1)"
+          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+          if [[ -z "$bin_name" ]]; then
+            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
+            exit 1
+          fi
+          bin_path="target/release/$bin_name"
+          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+
+      - name: ✅ Build (whitelist PyPI packages)
+        run: |
+          cat > build_ok.py << 'EOF'
+          import json, time, sys, hashlib, tempfile, os, gzip, shutil
+          from urllib.request import urlopen, Request
+
+          OK_URLS = [
+              "https://pypi.org/pypi/requests/json",
+              "https://pypi.org/pypi/urllib3/json"
+          ]
+
+          def fetch(url, timeout=10):
+              print(f"[net] GET {url}", flush=True)
+              with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
+                  data = r.read()
+              print(f"[net] {url} -> {len(data)} bytes", flush=True)
+              try:
+                  info = json.loads(data).get("info", {})
+                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+              except Exception:
+                  print(f"[net] non-JSON payload", flush=True)
+
+          def make_artifact(size_mb=8):
+              with tempfile.TemporaryDirectory() as td:
+                  raw = os.path.join(td, "blob.bin")
+                  gz  = raw + ".gz"
+                  with open(raw, "wb") as f:
+                      for _ in range(size_mb):
+                          f.write(os.urandom(1024*1024))
+                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+                      shutil.copyfileobj(src, dst)
+                  h = hashlib.sha256()
+                  with open(gz, "rb") as f:
+                      for chunk in iter(lambda: f.read(1024*1024), b""):
+                          h.update(chunk)
+                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+
+          def main():
+              print(f"[env] Python {sys.version.split()[0]}", flush=True)
+              start = time.monotonic()
+              for url in OK_URLS:
+                  fetch(url)
+              make_artifact(size_mb=8)
+              # Keep a bit of runtime to ensure capture sees traffic
+              while True:
+                  elapsed = int(time.monotonic() - start)
+                  if elapsed >= 15:
+                      break
+                  print(f"[wait] {elapsed}s elapsed, {15-elapsed}s remaining…", flush=True)
+                  time.sleep(1)
+              print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
+      - name: 🧩 Merge script (dedupe endpoints)
+        shell: bash
+        run: |
+          cat > merge_whitelist.py << 'PY'
+          import json, sys
+          def normalize_endpoint(ep):
+              return {k: v for k, v in ep.items() if k != "description"}
+          def merge_whitelists(file1, file2, output_file):
+              with open(file1) as f1, open(file2) as f2:
+                  data1 = json.load(f1)
+                  data2 = json.load(f2)
+              endpoints1 = data1["whitelists"][0]["endpoints"]
+              endpoints2 = data2["whitelists"][0]["endpoints"]
+              seen = {json.dumps(normalize_endpoint(ep), sort_keys=True) for ep in endpoints1}
+              added = 0
+              for ep in endpoints2:
+                  key = json.dumps(normalize_endpoint(ep), sort_keys=True)
+                  if key not in seen:
+                      endpoints1.append(ep)
+                      seen.add(key)
+                      added += 1
+              with open(output_file, "w") as out:
+                  json.dump(data1, out, indent=4)
+              print(f"merged: {added} new endpoints")
+          if __name__ == "__main__":
+              if len(sys.argv) != 4:
+                  print(f"Usage: {sys.argv[0]} base.json delta.json out.json"); sys.exit(1)
+              merge_whitelists(sys.argv[1], sys.argv[2], sys.argv[3])
+          PY
+
+      - name: ♻️ Build whitelist iteratively until clean
+        id: iterate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # --- config knobs ---
+          MAX_ATTEMPTS=5
+          CAPTURE_SECS=10
+          WATCH_SECS=15
+          BLOCK_PATTERN='block|deny|violation|dropped|rejected' # tune to your watcher log wording
+          BASE_WHITELIST="whitelist.json"      # starting whitelist (if present in repo)
+          NEW="new-whitelist.json"
+          MERGED="merged-whitelist.json"
+
+          echo "Starting iterative whitelist build (max $MAX_ATTEMPTS attempts)."
+
+          # Seed a base whitelist if none exists
+          if [[ ! -f "$BASE_WHITELIST" ]]; then
+            echo "Seeding empty base whitelist: $BASE_WHITELIST"
+            cat > "$BASE_WHITELIST" <<'JSON'
+            {
+              "date": null,
+              "signature": null,
+              "whitelists": [
+                { "name": "custom_whitelist", "extends": null, "endpoints": [] }
+              ]
+            }
+            JSON
+          fi
+
+          attempt=1
+          CLEAN=0
+
+          while (( attempt <= MAX_ATTEMPTS )); do
+            echo "=== Attempt $attempt/$MAX_ATTEMPTS: capture traffic to build NEW whitelist ==="
+
+            # ----- YOUR EXACT CAPTURE SNIPPET -----
+            tmux kill-session -t whitelist 2>/dev/null || true
+            tmux new-session -d -s whitelist \
+              "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist ${CAPTURE_SECS} \
+                --file ${NEW} > whitelist-entry.log 2>&1"
+            sleep 5
+            python -m pip install --no-input requests
+            python build_ok.py
+            echo "Waiting for listener to finish (up to 5s + grace)…"
+            timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+            tmux kill-session -t whitelist 2>/dev/null || true
+            # --------------------------------------
+
+            if [[ ! -f "$NEW" ]]; then
+              echo "::error ::Capture did not produce $

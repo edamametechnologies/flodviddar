@@ -8,17 +8,6 @@
             "endpoints": [
                 {
                     "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 55406,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:55406"
-                },
-                {
-                    "domain": null,
                     "ip": "168.63.129.16",
                     "port": 32526,
                     "protocol": "TCP",
@@ -63,17 +52,6 @@
                 },
                 {
                     "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 56360,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:56360"
-                },
-                {
-                    "domain": null,
                     "ip": "140.82.113.23",
                     "port": 443,
                     "protocol": "TCP",
@@ -82,17 +60,6 @@
                     "as_owner": null,
                     "process": "provjobd3563935",
                     "description": "Auto-generated from session: 10.1.0.13:51004 -> 140.82.113.23:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 56362,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:56362"
                 },
                 {
                     "domain": null,
@@ -107,28 +74,6 @@
                 },
                 {
                     "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 33032,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:33032"
-                },
-                {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 55398,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:55398"
-                },
-                {
-                    "domain": null,
                     "ip": "151.101.64.223",
                     "port": 443,
                     "protocol": "TCP",
@@ -137,28 +82,6 @@
                     "as_owner": null,
                     "process": null,
                     "description": "Auto-generated from session: 10.1.0.13:58160 -> 151.101.64.223:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 33046,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:33046"
-                },
-                {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 33034,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:33034"
                 },
                 {
                     "domain": null,
@@ -183,17 +106,6 @@
                     "description": "Auto-generated from session: 10.1.0.13:35688 -> 140.82.112.22:443"
                 },
                 {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 55392,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:55392"
-                },
-                {
                     "domain": "files.pythonhosted.org",
                     "ip": "199.232.96.223",
                     "port": 443,
@@ -203,17 +115,6 @@
                     "as_owner": null,
                     "process": "python",
                     "description": "Auto-generated from session: 10.1.0.13:51588 -> 199.232.96.223:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "10.1.0.13",
-                    "port": 56344,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 168.63.129.16:32526 -> 10.1.0.13:56344"
                 }
             ]
         }
