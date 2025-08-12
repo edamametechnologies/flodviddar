@@ -1,11 +1,11 @@
-name: Test of the project
+name: Populate whitelist
 
 on:
   pull_request:
     branches: ["*"]
 
 jobs:
-  create_whitelist:
+  populate_whitelist_python_linux:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -128,7 +128,7 @@ jobs:
       - name: 🧩 Merge whitelist (dedupe endpoints)
         shell: bash
         run: |
-          merge_whitelist.py whitelist.json new-whitelist.json
+          python merge_whitelist.py whitelist.json new-whitelist.json
 
       - name: 🎯 Try the whitelist
         shell: bash
