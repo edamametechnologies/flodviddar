@@ -119,7 +119,7 @@ jobs:
             tmux kill-session -t whitelist 2>/dev/null || true
             tmux new-session -d -s whitelist \
               "sudo -E '$BIN' create-whitelist 10 \
-                --file new-whitelist.json > whitelist-entry.log 2>&1"
+                --file whitelist.json --augment --file whitelist.json> whitelist-entry.log 2>&1"
 
             sleep 5
 
@@ -131,8 +131,6 @@ jobs:
             timeout 60 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
             tmux kill-session -t whitelist 2>/dev/null || true
 
-            echo "==> Merging whitelist"
-            python merge_whitelist.py whitelist.json new-whitelist.json
 
             echo "==> Trying whitelist"
             tmux kill-session -t whitelist 2>/dev/null || true
