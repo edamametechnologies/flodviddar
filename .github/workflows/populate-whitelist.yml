@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
 
           BIN='${{ steps.bin.outputs.path }}'
-          MAX_ITERS=5   # safety cap
+          MAX_ITERS=15   # safety cap
           PASS=0
 
           run_iteration() {
@@ -159,6 +159,7 @@ jobs:
               echo "❌ Policy violations detected on iteration $i — will try again."
             else
               echo "✅ No policy violations detected on iteration $i."
+              cat whitelist.json
               PASS=1
               break
             fi
