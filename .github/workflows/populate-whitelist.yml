@@ -138,7 +138,7 @@ jobs:
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
             "sudo -E '${{ steps.bin.outputs.path }}' watch 15 \
-              --custom-whitelist whitelist.json no-cancel false > try_whitelist.log 2>&1"
+              --custom-whitelist whitelist.json --no-cancel false > try_whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
