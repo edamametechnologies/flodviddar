@@ -105,49 +105,116 @@ jobs:
           if __name__ == "__main__":
               main()
           EOF
-
-      - name: 🎯 Start capture and generate traffic to create the whitelist
+      - name: 🔁 Iterate until whitelist passes
         shell: bash
         run: |
           set -euo pipefail
-          # 1) Start the listener in tmux (run as root so it can open raw sockets)
-          tmux kill-session -t whitelist 2>/dev/null || true
-          tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 10 \
-              --file new-whitelist.json > whitelist-entry.log 2>&1"
-          # 2) Give it time to bind
-          sleep 5
-          # 3) Do the traffic you actually want whitelisted (during capture!)
-          python -m pip install --no-input requests
-          python build_ok.py
-          # 4) Wait for capture to finish
-          echo "Waiting for listener to finish (up to 5s + grace)…"
-          timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-          tmux kill-session -t whitelist 2>/dev/null || true
 
-      - name: 🧩 Merge whitelist (dedupe endpoints)
-        shell: bash
-        run: |
-          python merge_whitelist.py whitelist.json new-whitelist.json
+          BIN='${{ steps.bin.outputs.path }}'
+          MAX_ITERS=5   # safety cap
+          PASS=0
 
-      - name: 🎯 Try the whitelist
-        shell: bash
-        run: |
-          set -euo pipefail
-          # 1) Start the listener in tmux (run as root so it can open raw sockets)
-          tmux kill-session -t whitelist 2>/dev/null || true
-          tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' watch 15 \
-              --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
-          # 2) Give it time to bind
-          sleep 5
-          # 3) Do the traffic you actually want whitelisted (during capture!)
-          python -m pip install --no-input requests
-          python build_ok.py
-          timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          run_iteration() {
+            echo "==> Starting capture"
+            tmux kill-session -t whitelist 2>/dev/null || true
+            tmux new-session -d -s whitelist \
+              "sudo -E '$BIN' create-whitelist 10 \
+                --file new-whitelist.json > whitelist-entry.log 2>&1"
 
-      - name: ♻️ Check if the whitelist is enough
-        id: iterate
-        shell: bash
-        run: |
-          cat try_whitelist.log
+            sleep 5
+
+            echo "==> Generating traffic"
+            python -m pip install --no-input requests
+            python build_ok.py
+
+            echo "==> Waiting for listener to finish"
+            timeout 60 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+            tmux kill-session -t whitelist 2>/dev/null || true
+
+            echo "==> Merging whitelist"
+            python merge_whitelist.py whitelist.json new-whitelist.json
+
+            echo "==> Trying whitelist"
+            tmux kill-session -t whitelist 2>/dev/null || true
+            tmux new-session -d -s whitelist \
+              "sudo -E '$BIN' watch 15 \
+                --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
+
+            sleep 5
+            python -m pip install --no-input requests
+            python build_ok.py
+            timeout 5 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+            tmux kill-session -t whitelist 2>/dev/null || true
+
+            echo "==> Log tail:"
+            tail -n 200 try_whitelist.log || true
+          }
+
+          for i in $(seq 1 "$MAX_ITERS"); do
+            echo ""
+            echo "================ Iteration $i / $MAX_ITERS ================"
+            run_iteration
+
+            if grep -Fqi "Policy violations detected" try_whitelist.log; then
+              echo "❌ Policy violations detected on iteration $i — will try again."
+            else
+              echo "✅ No policy violations detected on iteration $i."
+              PASS=1
+              break
+            fi
+          done
+
+          if [[ "$PASS" -ne 1 ]]; then
+            echo "❌ Still policy violations detected after $MAX_ITERS iterations."
+            echo "Here is the final log:"
+            cat try_whitelist.log || true
+            exit 1
+          fi
+
+          echo "🎉 Whitelist sufficient."
+
+      # - name: 🎯 Start capture and generate traffic to create the whitelist
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     # 1) Start the listener in tmux (run as root so it can open raw sockets)
+      #     tmux kill-session -t whitelist 2>/dev/null || true
+      #     tmux new-session -d -s whitelist \
+      #       "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 10 \
+      #         --file new-whitelist.json > whitelist-entry.log 2>&1"
+      #     # 2) Give it time to bind
+      #     sleep 5
+      #     # 3) Do the traffic you actually want whitelisted (during capture!)
+      #     python -m pip install --no-input requests
+      #     python build_ok.py
+      #     # 4) Wait for capture to finish
+      #     echo "Waiting for listener to finish (up to 5s + grace)…"
+      #     timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+      #     tmux kill-session -t whitelist 2>/dev/null || true
+
+      # - name: 🧩 Merge whitelist (dedupe endpoints)
+      #   shell: bash
+      #   run: |
+      #     python merge_whitelist.py whitelist.json new-whitelist.json
+
+      # - name: 🎯 Try the whitelist
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     # 1) Start the listener in tmux (run as root so it can open raw sockets)
+      #     tmux kill-session -t whitelist 2>/dev/null || true
+      #     tmux new-session -d -s whitelist \
+      #       "sudo -E '${{ steps.bin.outputs.path }}' watch 10 \
+      #         --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
+      #     # 2) Give it time to bind
+      #     sleep 5
+      #     # 3) Do the traffic you actually want whitelisted (during capture!)
+      #     python -m pip install --no-input requests
+      #     python build_ok.py
+      #     timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+
+      # - name: ♻️ Check if the whitelist is enough
+      #   id: iterate
+      #   shell: bash
+      #   run: |
+      #     cat try_whitelist.log
