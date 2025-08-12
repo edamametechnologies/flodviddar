@@ -30,91 +30,36 @@
                 },
                 {
                     "domain": null,
-                    "ip": "185.199.111.133",
+                    "ip": "185.199.110.133",
                     "port": 443,
                     "protocol": "TCP",
                     "as_number": null,
                     "as_country": null,
                     "as_owner": null,
                     "process": null,
-                    "description": "Auto-generated from session: 10.1.0.13:45394 -> 185.199.111.133:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "168.63.129.16",
-                    "port": 80,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 10.1.0.13:47104 -> 168.63.129.16:80"
-                },
-                {
-                    "domain": null,
-                    "ip": "140.82.113.23",
-                    "port": 443,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": "provjobd3563935",
-                    "description": "Auto-generated from session: 10.1.0.13:51004 -> 140.82.113.23:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "151.101.0.223",
-                    "port": 443,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": "python",
-                    "description": "Auto-generated from session: 10.1.0.13:33626 -> 151.101.0.223:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "151.101.64.223",
-                    "port": 443,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 10.1.0.13:58160 -> 151.101.64.223:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "20.209.227.33",
-                    "port": 443,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 10.1.0.13:34762 -> 20.209.227.33:443"
-                },
-                {
-                    "domain": null,
-                    "ip": "140.82.112.22",
-                    "port": 443,
-                    "protocol": "TCP",
-                    "as_number": null,
-                    "as_country": null,
-                    "as_owner": null,
-                    "process": null,
-                    "description": "Auto-generated from session: 10.1.0.13:35688 -> 140.82.112.22:443"
+                    "description": "Auto-generated from session: 10.1.0.223:51624 -> 185.199.110.133:443"
                 },
                 {
                     "domain": "files.pythonhosted.org",
-                    "ip": "199.232.96.223",
+                    "ip": "146.75.76.223",
                     "port": 443,
                     "protocol": "TCP",
                     "as_number": null,
                     "as_country": null,
                     "as_owner": null,
                     "process": "python",
-                    "description": "Auto-generated from session: 10.1.0.13:51588 -> 199.232.96.223:443"
+                    "description": "Auto-generated from session: 10.1.0.223:60884 -> 146.75.76.223:443"
+                },
+                {
+                    "domain": "pypi.org",
+                    "ip": "151.101.192.223",
+                    "port": 443,
+                    "protocol": "TCP",
+                    "as_number": null,
+                    "as_country": null,
+                    "as_owner": null,
+                    "process": "python",
+                    "description": "Auto-generated from session: 10.1.0.223:42516 -> 151.101.192.223:443"
                 }
             ]
         }

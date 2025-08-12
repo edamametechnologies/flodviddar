@@ -1,42 +1,46 @@
-import json
-import sys
+import json, sys, shutil
+from pathlib import Path
 
 
 def normalize_endpoint(endpoint):
-    """Return a normalized dict without 'description' for comparison."""
     return {k: v for k, v in endpoint.items() if k != "description"}
 
 
-def merge_whitelists(file1, file2, output_file):
-    # Load both JSON files
-    with open(file1) as f1, open(file2) as f2:
-        data1 = json.load(f1)
-        data2 = json.load(f2)
+def merge_whitelist_in_place(file1, file2, make_backup=True):
+    f1 = Path(file1)
+    f2 = Path(file2)
 
-    # Extract endpoint lists
+    # Optional backup
+    if make_backup:
+        shutil.copy2(f1, f1.with_suffix(f1.suffix + ".bak"))
+
+    with open(f1) as a, open(f2) as b:
+        data1 = json.load(a)
+        data2 = json.load(b)
+
     endpoints1 = data1["whitelists"][0]["endpoints"]
     endpoints2 = data2["whitelists"][0]["endpoints"]
 
-    # Track unique endpoints (ignoring description)
     seen = {json.dumps(normalize_endpoint(ep), sort_keys=True) for ep in endpoints1}
 
-    # Merge
+    added = 0
     for ep in endpoints2:
-        norm_ep_str = json.dumps(normalize_endpoint(ep), sort_keys=True)
-        if norm_ep_str not in seen:
+        key = json.dumps(normalize_endpoint(ep), sort_keys=True)
+        if key not in seen:
             endpoints1.append(ep)
-            seen.add(norm_ep_str)
+            seen.add(key)
+            added += 1
 
-    # Save result
-    with open(output_file, "w") as out:
+    with open(f1, "w") as out:
         json.dump(data1, out, indent=4)
 
-    print(f"Merged whitelist saved to {output_file}")
+    print(f"Added {added} new endpoints to {file1}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} file1.json file2.json output.json")
+    if len(sys.argv) < 3:
+        print(f"Usage: {sys.argv[0]} file1.json file2.json [--no-backup]")
         sys.exit(1)
-
-    merge_whitelists(sys.argv[1], sys.argv[2], sys.argv[3])
+    merge_whitelist_in_place(
+        sys.argv[1], sys.argv[2], make_backup="--no-backup" not in sys.argv
+    )
