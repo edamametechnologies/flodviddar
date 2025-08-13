@@ -96,9 +96,9 @@ jobs:
               # Keep a bit of runtime to ensure capture sees traffic
               while True:
                   elapsed = int(time.monotonic() - start)
-                  if elapsed >= 15:
+                  if elapsed >= 30:
                       break
-                  print(f"[wait] {elapsed}s elapsed, {15-elapsed}s remaining…", flush=True)
+                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
                   time.sleep(1)
               print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
 
@@ -109,9 +109,10 @@ jobs:
       - name: 🔁 Iterate until whitelist passes
         shell: bash
         run: |
+          cat whitelist.json
           set -euo pipefail
           BIN='${{ steps.bin.outputs.path }}'
-          MAX_ITERS=15   # safety cap
+          MAX_ITERS=3   # safety cap
           PASS=0
           run_iteration() {
             echo "==> Starting capture"
