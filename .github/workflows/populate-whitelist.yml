@@ -109,7 +109,7 @@ jobs:
       - name: 🔁 Iterate until whitelist passes
         shell: bash
         run: |
-          cat whitelist.json
+          jq . whitelist.json
           set -euo pipefail
           BIN='${{ steps.bin.outputs.path }}'
           MAX_ITERS=15   # safety cap
@@ -146,11 +146,11 @@ jobs:
             run_iteration
             if grep -Fqi "Policy violations detected" try_whitelist.log; then
               echo "==> Failed whitelist"
-              cat whitelist.json
+              jq . whitelist.json
               echo "❌ Policy violations detected on iteration $i — will try again."
             else
               echo "✅ No policy violations detected on iteration $i."
-              cat whitelist.json
+              jq . whitelist.json
               PASS=1
               break
             fi
