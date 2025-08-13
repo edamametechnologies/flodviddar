@@ -105,6 +105,7 @@ jobs:
           if __name__ == "__main__":
               main()
           EOF
+
       - name: 🔁 Iterate until whitelist passes
         shell: bash
         run: |
@@ -116,8 +117,8 @@ jobs:
             echo "==> Starting capture"
             tmux kill-session -t whitelist 2>/dev/null || true
             tmux new-session -d -s whitelist \
-              "sudo -E '$BIN' create-whitelist 10 \
-                --file new-whitelist.json > whitelist-entry.log 2>&1"
+              "sudo -E '$BIN' create-whitelist 10 true \
+                --file whitelist.json > whitelist-entry.log 2>&1"
             sleep 5
             echo "==> Generating traffic"
             python -m pip install --no-input requests
@@ -125,8 +126,6 @@ jobs:
             echo "==> Waiting for listener to finish"
             timeout 60 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
             tmux kill-session -t whitelist 2>/dev/null || true
-            echo "==> Merging whitelist"
-            python merge_whitelist.py whitelist.json new-whitelist.json
             echo "==> Trying whitelist"
             tmux kill-session -t whitelist 2>/dev/null || true
             tmux new-session -d -s whitelist \
@@ -145,6 +144,8 @@ jobs:
             echo "================ Iteration $i / $MAX_ITERS ================"
             run_iteration
             if grep -Fqi "Policy violations detected" try_whitelist.log; then
+              echo "==> Failed whitelist"
+              cat whitelist.json
               echo "❌ Policy violations detected on iteration $i — will try again."
             else
               echo "✅ No policy violations detected on iteration $i."
@@ -160,6 +161,7 @@ jobs:
             exit 1
           fi
           echo "🎉 Whitelist sufficient."
+
       # - name: 🔁 Iterate until whitelist passes
       #   shell: bash
       #   run: |
