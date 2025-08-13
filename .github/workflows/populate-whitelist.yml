@@ -112,7 +112,7 @@ jobs:
           cat whitelist.json
           set -euo pipefail
           BIN='${{ steps.bin.outputs.path }}'
-          MAX_ITERS=3   # safety cap
+          MAX_ITERS=15   # safety cap
           PASS=0
           run_iteration() {
             echo "==> Starting capture"
@@ -130,7 +130,7 @@ jobs:
             echo "==> Trying whitelist"
             tmux kill-session -t whitelist 2>/dev/null || true
             tmux new-session -d -s whitelist \
-              "sudo -E '$BIN' watch 15 \
+              "sudo -E '$BIN' watch 30 \
                 --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
             sleep 5
             python -m pip install --no-input requests
