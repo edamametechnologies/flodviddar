@@ -83,6 +83,15 @@ pub async fn watch_daemon(
             }
         }
 
+        if violations {
+            println!("\n=== Violating Sessions ===");
+            for line in format_sessions_log(&violating_sessions) {
+                println!("{}", line);
+            }
+            println!("Policy violations detected");
+            std::process::exit(1);
+        }
+
         if cancel_on_violation && violations {
             println!("\n=== Violating Sessions ===");
             for line in format_sessions_log(&violating_sessions) {
