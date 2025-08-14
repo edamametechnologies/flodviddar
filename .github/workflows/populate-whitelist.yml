@@ -186,12 +186,6 @@ jobs:
       - name: 🦀 Install Rust (nightly)
         uses: dtolnay/rust-toolchain@nightly
 
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🦀 Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
-
       - name: 🧰 System deps (pcap, tmux, jq)
         run: |
           sudo apt-get update
@@ -267,7 +261,7 @@ jobs:
               # Keep a bit of runtime to ensure capture sees traffic
               while True:
                   elapsed = int(time.monotonic() - start)
-                  if elapsed >= 65:
+                  if elapsed >= 55:
                       break
                   print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
                   time.sleep(1)
@@ -289,7 +283,7 @@ jobs:
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' watch 15 \
+            "sudo -E '${{ steps.bin.outputs.path }}' watch 50 \
               --custom-whitelist whitelist.json > whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
@@ -297,6 +291,7 @@ jobs:
           python -m pip install --no-input requests
           python build_ok.py
           timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          cat whitelist.log
           if grep -Fqi "Policy violations detected" whitelist.log; then
             cat whitelist.log
             echo "==> Failed whitelist"
@@ -318,12 +313,6 @@ jobs:
       contents: read
 
     steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🦀 Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
-
       - name: 📦 Checkout
         uses: actions/checkout@v4
 
@@ -410,7 +399,7 @@ jobs:
 
               make_artifact(size_mb=8)
 
-              # Ensure total runtime >= 30s
+              # Ensure total runtime >= 55s
               while True:
                   elapsed = int(time.monotonic() - start)
                   if elapsed >= 30:
@@ -436,7 +425,7 @@ jobs:
           # 1) Start the listener in tmux (run as root so it can open raw sockets)
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' watch 15 \
+            "sudo -E '${{ steps.bin.outputs.path }}' watch 50 \
               --custom-whitelist whitelist.json > whitelist.log 2>&1"
           # 2) Give it time to bind
           sleep 5
@@ -444,6 +433,7 @@ jobs:
           python -m pip install --no-input requests
           python build_violation.py
           timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          cat whitelist.log
           if grep -Fqi "Policy violations detected" whitelist.log; then
             echo "==> Failed whitelist"
             jq . whitelist.json
