@@ -1044,8 +1044,8 @@ dependencies = [
 
 [[package]]
 name = "flodbadd"
-version = "0.9.61"
-source = "git+https://github.com/edamametechnologies/flodbadd?branch=refine-whitelist#2c09179c9124503ae5a0764cb97aa3dc6153657e"
+version = "0.9.60"
+source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#6951ed0118524b591bf334c959c9c1124f97e0b9"
 dependencies = [
  "anyhow",
  "arp-toolkit",
@@ -1326,9 +1326,9 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "h2"
-version = "0.4.11"
+version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17da50a276f1e01e0ba6c029e47b7100754904ee8a278f886546e98575380785"
+checksum = "f3c0b69cfcb4e1b9f1bf2f53f95f766e4661169728ec61cd3fe5a0166f2d1386"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4105,9 +4105,9 @@ dependencies = [
 
 [[package]]
 name = "windows-registry"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3bab093bdd303a1240bb99b8aba8ea8a69ee19d34c9e2ef9594e708a4878820"
+checksum = "5b8a9ed28765efc97bbc954883f4e6796c33a06546ebafacbabee9696967499e"
 dependencies = [
  "windows-link",
  "windows-result",
