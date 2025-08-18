@@ -400,6 +400,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
                     .expect("Failed to get whitelist from artifact");
                 if std::path::Path::new(path).exists() && whitelist.is_empty() {
                     // Path exist so we set the current whitelist
+                    println!("Using existing whitelist from path: {}", path);
                     let existing = std::fs::read_to_string(path)?;
                     capture.set_custom_whitelists(&existing).await;
                 } else {

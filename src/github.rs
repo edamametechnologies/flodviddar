@@ -101,5 +101,23 @@ impl GithubApi {
         Ok("".to_string())
     }
 
+    pub async fn rerun_actual_pipeline(&self) -> Result<(), String> {
+        let repo = self.repo.clone(); // "owner/repo"
+        let run_id = self.run_id.clone();
+
+        // Trigger the rerun
+        let status = Command::new("gh")
+            .args(["run", "rerun", &run_id, "-R", &repo])
+            .status()
+            .map_err(|e| format!("failed to run `gh run rerun`: {e}"))?;
+
+        if !status.success() {
+            return Err(format!("`gh run rerun` exited with {}", status));
+        }
+
+        println!("Rerun triggered successfully");
+        Ok(())
+    }
+
     // pub async fn restart_pipeline
 }
