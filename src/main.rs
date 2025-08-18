@@ -10,6 +10,8 @@ use flodbadd::{
 };
 use tokio::time::sleep;
 
+mod github;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut cmd = build_cli();
@@ -75,6 +77,16 @@ async fn main() -> Result<()> {
             .await?;
         }
         Some(("create-whitelist", sub)) => {
+            let seconds = *sub.get_one::<u64>("SECONDS").unwrap_or(&60);
+            let augment = *sub.get_one::<bool>("AUGMENT").unwrap_or(&false);
+            let output_path = sub.get_one::<String>("file").map(|s| s.as_str());
+            create_whitelist(seconds, augment, output_path).await?;
+        }
+        Some(("auto-whitelist", sub)) => {
+            let upload = sub
+                .get_one::<String>("upload")
+                .map(|s| s.as_str())
+                .unwrap_or("artifact");
             let seconds = *sub.get_one::<u64>("SECONDS").unwrap_or(&60);
             let augment = *sub.get_one::<bool>("AUGMENT").unwrap_or(&false);
             let output_path = sub.get_one::<String>("file").map(|s| s.as_str());
@@ -200,6 +212,26 @@ pub fn build_cli() -> ClapCommand {
                 .arg(
                     arg!(--file <PATH> "Output path for the generated (or augmented) whitelist JSON")
                         .required(false)
+                        .value_parser(clap::value_parser!(String)),
+                ),
+        )
+        .subcommand(
+            ClapCommand::new("auto-whitelist")
+                // TODO: Do the about
+                .about("Generate a custom whitelist JSON from observed traffic will push until the network is done")
+                .arg(
+                    arg!(--upload <UPLOAD> "TODO: default artifact")
+                        .required(false)
+                        .value_parser(clap::value_parser!(String)),
+                )
+                .arg(
+                    arg!([SECONDS] "Capture duration in seconds before generating whitelist (default 60)")
+                        .required(false)
+                        .value_parser(clap::value_parser!(u64)),
+                )
+                .arg(
+                    arg!(--output <PATH> "Output path for the augmented whitelist JSON")
+                        .required(true)
                         .value_parser(clap::value_parser!(String)),
                 ),
         )
@@ -395,7 +427,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
     }
 
     let json = if augment {
-        capture.augment_custom_whitelists().await?
+        capture.augment_custom_whitelists().await?.0
     } else {
         capture.create_custom_whitelists().await?
     };
