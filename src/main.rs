@@ -392,8 +392,8 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
     match augment {
         true => {
             // check if the user give a file
+            let github_cli = GithubApi::new();
             if let Some(path) = output_path {
-                let github_cli = GithubApi::new();
                 let whitelist = github_cli
                     .get_whitelist_artifact(path)
                     .await
@@ -423,6 +423,11 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
                 // Write the file to be able to upload
                 std::fs::write(name_whitelist.clone(), &whitelist_json)?;
                 println!("Augment Whitelist written to {}", name_whitelist);
+                // Rerun the pipeline
+                github_cli
+                    .rerun_actual_pipeline()
+                    .await
+                    .expect("Rerun the pipeline");
             } else {
                 println!("No new entries added to the custom whitelist");
             }
