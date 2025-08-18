@@ -114,7 +114,7 @@ jobs:
           tmux kill-session -t whitelist 2>/dev/null || true
           tmux new-session -d -s whitelist \
             "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 30 true \
-              --file whitelist.json > whitelist-entry.log 2>&1"
+              --file whitelist.json > flodviddar.log 2>&1"
           # 2) Give it time to bind
           sleep 5
           # 3) Do the traffic you actually want whitelisted (during capture!)
@@ -124,6 +124,7 @@ jobs:
           echo "Waiting for listener to finish (up to 5s + grace)…"
           timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
           tmux kill-session -t whitelist 2>/dev/null || true
+          cat flodviddar.log
 
       - name: Resolve which file to upload
         id: resolve

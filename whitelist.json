@@ -1,0 +1,11 @@
+{
+    "date": "August 18th 2025",
+    "signature": null,
+    "whitelists": [
+        {
+            "name": "custom_whitelist",
+            "extends": null,
+            "endpoints": []
+        }
+    ]
+}
