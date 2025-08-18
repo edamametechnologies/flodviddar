@@ -11,8 +11,6 @@ pub struct GithubApi {
 pub struct Artifact {
     id: u64,
     name: String,
-    size: u64,
-    url: String,
 }
 
 #[derive(serde::Deserialize, Debug)]
