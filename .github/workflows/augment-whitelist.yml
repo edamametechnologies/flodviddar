@@ -134,7 +134,7 @@ jobs:
           base="whitelist.json"
           base="${base##*/}"              # just the filename
           [[ "$base" == *.json ]] || base="${base}.json"
-          aug="augment-$base"
+          aug="augment_$base"
 
           if [[ -f "$aug" ]]; then
             chosen="$aug"
