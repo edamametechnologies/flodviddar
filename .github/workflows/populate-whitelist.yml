@@ -1,444 +1,444 @@
-name: Populate whitelist
+# name: Populate whitelist
 
-on:
-  pull_request:
-    branches: ["*"]
+# on:
+#   pull_request:
+#     branches: ["*"]
 
-jobs:
-  populate_whitelist_python_linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      GH_TOKEN: ${{ github.token }}
-    permissions:
-      actions: write
-      contents: read
+# jobs:
+#   populate_whitelist_python_linux:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 30
+#     env:
+#       GH_TOKEN: ${{ github.token }}
+#     permissions:
+#       actions: write
+#       contents: read
 
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📦 Checkout
+#         uses: actions/checkout@v4
 
-      - name: 🦀 Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+#       - name: 🦀 Install Rust (nightly)
+#         uses: dtolnay/rust-toolchain@nightly
 
-      - name: 🧰 System deps (pcap, tmux, jq)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcap-dev tmux jq
+#       - name: 🧰 System deps (pcap, tmux, jq)
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libpcap-dev tmux jq
 
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+#       - name: 🐍 Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.10"
 
-      - name: ⚙️ Build sniffer (release)
-        run: cargo build --release
+#       - name: ⚙️ Build sniffer (release)
+#         run: cargo build --release
 
-      - name: 🔎 Find built binary paths
-        id: bin
-        shell: bash
-        run: |
-          set -euo pipefail
-          meta_json="$(cargo metadata --no-deps --format-version=1)"
-          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
-          if [[ -z "$bin_name" ]]; then
-            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
-            exit 1
-          fi
-          bin_path="target/release/$bin_name"
-          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
-          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
-          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+#       - name: 🔎 Find built binary paths
+#         id: bin
+#         shell: bash
+#         run: |
+#           set -euo pipefail
+#           meta_json="$(cargo metadata --no-deps --format-version=1)"
+#           bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+#           if [[ -z "$bin_name" ]]; then
+#             echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
+#             exit 1
+#           fi
+#           bin_path="target/release/$bin_name"
+#           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+#           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+#           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
 
-      - name: ✅ Build (whitelist PyPI packages)
-        run: |
-          cat > build_ok.py << 'EOF'
-          import json, time, sys, hashlib, tempfile, os, gzip, shutil
-          from urllib.request import urlopen, Request
+#       - name: ✅ Build (whitelist PyPI packages)
+#         run: |
+#           cat > build_ok.py << 'EOF'
+#           import json, time, sys, hashlib, tempfile, os, gzip, shutil
+#           from urllib.request import urlopen, Request
 
-          OK_URLS = [
-              "https://pypi.org/pypi/requests/json",
-              "https://pypi.org/pypi/urllib3/json"
-          ]
+#           OK_URLS = [
+#               "https://pypi.org/pypi/requests/json",
+#               "https://pypi.org/pypi/urllib3/json"
+#           ]
 
-          def fetch(url, timeout=10):
-              print(f"[net] GET {url}", flush=True)
-              with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
-                  data = r.read()
-              print(f"[net] {url} -> {len(data)} bytes", flush=True)
-              try:
-                  info = json.loads(data).get("info", {})
-                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
-              except Exception:
-                  print(f"[net] non-JSON payload", flush=True)
+#           def fetch(url, timeout=10):
+#               print(f"[net] GET {url}", flush=True)
+#               with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
+#                   data = r.read()
+#               print(f"[net] {url} -> {len(data)} bytes", flush=True)
+#               try:
+#                   info = json.loads(data).get("info", {})
+#                   print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+#               except Exception:
+#                   print(f"[net] non-JSON payload", flush=True)
 
-          def make_artifact(size_mb=8):
-              with tempfile.TemporaryDirectory() as td:
-                  raw = os.path.join(td, "blob.bin")
-                  gz  = raw + ".gz"
-                  with open(raw, "wb") as f:
-                      for _ in range(size_mb):
-                          f.write(os.urandom(1024*1024))
-                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
-                      shutil.copyfileobj(src, dst)
-                  h = hashlib.sha256()
-                  with open(gz, "rb") as f:
-                      for chunk in iter(lambda: f.read(1024*1024), b""):
-                          h.update(chunk)
-                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+#           def make_artifact(size_mb=8):
+#               with tempfile.TemporaryDirectory() as td:
+#                   raw = os.path.join(td, "blob.bin")
+#                   gz  = raw + ".gz"
+#                   with open(raw, "wb") as f:
+#                       for _ in range(size_mb):
+#                           f.write(os.urandom(1024*1024))
+#                   with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+#                       shutil.copyfileobj(src, dst)
+#                   h = hashlib.sha256()
+#                   with open(gz, "rb") as f:
+#                       for chunk in iter(lambda: f.read(1024*1024), b""):
+#                           h.update(chunk)
+#                   print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
 
-          def main():
-              print(f"[env] Python {sys.version.split()[0]}", flush=True)
-              start = time.monotonic()
-              for url in OK_URLS:
-                  fetch(url)
-              make_artifact(size_mb=8)
-              # Keep a bit of runtime to ensure capture sees traffic
-              while True:
-                  elapsed = int(time.monotonic() - start)
-                  if elapsed >= 65:
-                      break
-                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
-                  time.sleep(1)
-              print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
+#           def main():
+#               print(f"[env] Python {sys.version.split()[0]}", flush=True)
+#               start = time.monotonic()
+#               for url in OK_URLS:
+#                   fetch(url)
+#               make_artifact(size_mb=8)
+#               # Keep a bit of runtime to ensure capture sees traffic
+#               while True:
+#                   elapsed = int(time.monotonic() - start)
+#                   if elapsed >= 65:
+#                       break
+#                   print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+#                   time.sleep(1)
+#               print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
 
-          if __name__ == "__main__":
-              main()
-          EOF
+#           if __name__ == "__main__":
+#               main()
+#           EOF
 
-      - name: 🔁 Iterate until whitelist passes
-        shell: bash
-        run: |
-          jq . whitelist.json
-          set -euo pipefail
-          BIN='${{ steps.bin.outputs.path }}'
-          MAX_ITERS=15   # safety cap
-          PASS=0
-          run_iteration() {
-            echo "==> Starting capture"
-            tmux kill-session -t whitelist 2>/dev/null || true
-            tmux new-session -d -s whitelist \
-              "sudo -E '$BIN' create-whitelist 60 true \
-                --file whitelist.json > whitelist-entry.log 2>&1"
-            sleep 5
-            echo "==> Generating traffic"
-            python -m pip install --no-input requests
-            python build_ok.py
-            echo "==> Waiting for listener to finish"
-            timeout 60 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-            tmux kill-session -t whitelist 2>/dev/null || true
-            echo "==> Trying whitelist"
-            tmux kill-session -t whitelist 2>/dev/null || true
-            tmux new-session -d -s whitelist \
-              "sudo -E '$BIN' watch 30 \
-                --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
-            sleep 5
-            python -m pip install --no-input requests
-            python build_ok.py
-            timeout 5 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-            tmux kill-session -t whitelist 2>/dev/null || true
-            echo "==> Log tail:"
-            tail -n 200 try_whitelist.log || true
-          }
-          for i in $(seq 1 "$MAX_ITERS"); do
-            echo ""
-            echo "================ Iteration $i / $MAX_ITERS ================"
-            run_iteration
-            if grep -Fqi "Policy violations detected" try_whitelist.log; then
-              echo "==> Failed whitelist"
-              jq . whitelist.json
-              echo "❌ Policy violations detected on iteration $i — will try again."
-            else
-              echo "✅ No policy violations detected on iteration $i."
-              jq . whitelist.json
-              PASS=1
-              break
-            fi
-          done
-          if [[ "$PASS" -ne 1 ]]; then
-            echo "❌ Still policy violations detected after $MAX_ITERS iterations."
-            echo "Here is the final log:"
-            cat try_whitelist.log || true
-            exit 1
-          fi
-          echo "🎉 Whitelist sufficient."
+#       - name: 🔁 Iterate until whitelist passes
+#         shell: bash
+#         run: |
+#           jq . whitelist.json
+#           set -euo pipefail
+#           BIN='${{ steps.bin.outputs.path }}'
+#           MAX_ITERS=15   # safety cap
+#           PASS=0
+#           run_iteration() {
+#             echo "==> Starting capture"
+#             tmux kill-session -t whitelist 2>/dev/null || true
+#             tmux new-session -d -s whitelist \
+#               "sudo -E '$BIN' create-whitelist 60 true \
+#                 --file whitelist.json > whitelist-entry.log 2>&1"
+#             sleep 5
+#             echo "==> Generating traffic"
+#             python -m pip install --no-input requests
+#             python build_ok.py
+#             echo "==> Waiting for listener to finish"
+#             timeout 60 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+#             tmux kill-session -t whitelist 2>/dev/null || true
+#             echo "==> Trying whitelist"
+#             tmux kill-session -t whitelist 2>/dev/null || true
+#             tmux new-session -d -s whitelist \
+#               "sudo -E '$BIN' watch 30 \
+#                 --custom-whitelist whitelist.json > try_whitelist.log 2>&1"
+#             sleep 5
+#             python -m pip install --no-input requests
+#             python build_ok.py
+#             timeout 5 bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+#             tmux kill-session -t whitelist 2>/dev/null || true
+#             echo "==> Log tail:"
+#             tail -n 200 try_whitelist.log || true
+#           }
+#           for i in $(seq 1 "$MAX_ITERS"); do
+#             echo ""
+#             echo "================ Iteration $i / $MAX_ITERS ================"
+#             run_iteration
+#             if grep -Fqi "Policy violations detected" try_whitelist.log; then
+#               echo "==> Failed whitelist"
+#               jq . whitelist.json
+#               echo "❌ Policy violations detected on iteration $i — will try again."
+#             else
+#               echo "✅ No policy violations detected on iteration $i."
+#               jq . whitelist.json
+#               PASS=1
+#               break
+#             fi
+#           done
+#           if [[ "$PASS" -ne 1 ]]; then
+#             echo "❌ Still policy violations detected after $MAX_ITERS iterations."
+#             echo "Here is the final log:"
+#             cat try_whitelist.log || true
+#             exit 1
+#           fi
+#           echo "🎉 Whitelist sufficient."
 
-      - name: 📦 Upload whitelist
-        uses: actions/upload-artifact@v4
-        with:
-          name: whitelist.json
-          path: whitelist.json
+#       - name: 📦 Upload whitelist
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: whitelist.json
+#           path: whitelist.json
 
-  test_whitelist_python_linux:
-    runs-on: ubuntu-latest
-    needs: populate_whitelist_python_linux
-    timeout-minutes: 30
-    env:
-      GH_TOKEN: ${{ github.token }}
-    permissions:
-      actions: write
-      contents: read
+#   test_whitelist_python_linux:
+#     runs-on: ubuntu-latest
+#     needs: populate_whitelist_python_linux
+#     timeout-minutes: 30
+#     env:
+#       GH_TOKEN: ${{ github.token }}
+#     permissions:
+#       actions: write
+#       contents: read
 
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📦 Checkout
+#         uses: actions/checkout@v4
 
-      - name: 🦀 Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+#       - name: 🦀 Install Rust (nightly)
+#         uses: dtolnay/rust-toolchain@nightly
 
-      - name: 🧰 System deps (pcap, tmux, jq)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcap-dev tmux jq
+#       - name: 🧰 System deps (pcap, tmux, jq)
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libpcap-dev tmux jq
 
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+#       - name: 🐍 Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.10"
 
-      - name: ⚙️ Build sniffer (release)
-        run: cargo build --release
+#       - name: ⚙️ Build sniffer (release)
+#         run: cargo build --release
 
-      - name: 🔎 Find built binary paths
-        id: bin
-        shell: bash
-        run: |
-          set -euo pipefail
-          meta_json="$(cargo metadata --no-deps --format-version=1)"
-          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
-          if [[ -z "$bin_name" ]]; then
-            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
-            exit 1
-          fi
-          bin_path="target/release/$bin_name"
-          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
-          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
-          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+#       - name: 🔎 Find built binary paths
+#         id: bin
+#         shell: bash
+#         run: |
+#           set -euo pipefail
+#           meta_json="$(cargo metadata --no-deps --format-version=1)"
+#           bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+#           if [[ -z "$bin_name" ]]; then
+#             echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
+#             exit 1
+#           fi
+#           bin_path="target/release/$bin_name"
+#           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+#           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+#           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
 
-      - name: ✅ Build (whitelist PyPI packages)
-        run: |
-          cat > build_ok.py << 'EOF'
-          import json, time, sys, hashlib, tempfile, os, gzip, shutil
-          from urllib.request import urlopen, Request
+#       - name: ✅ Build (whitelist PyPI packages)
+#         run: |
+#           cat > build_ok.py << 'EOF'
+#           import json, time, sys, hashlib, tempfile, os, gzip, shutil
+#           from urllib.request import urlopen, Request
 
-          OK_URLS = [
-              "https://pypi.org/pypi/requests/json",
-              "https://pypi.org/pypi/urllib3/json"
-          ]
+#           OK_URLS = [
+#               "https://pypi.org/pypi/requests/json",
+#               "https://pypi.org/pypi/urllib3/json"
+#           ]
 
-          def fetch(url, timeout=10):
-              print(f"[net] GET {url}", flush=True)
-              with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
-                  data = r.read()
-              print(f"[net] {url} -> {len(data)} bytes", flush=True)
-              try:
-                  info = json.loads(data).get("info", {})
-                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
-              except Exception:
-                  print(f"[net] non-JSON payload", flush=True)
+#           def fetch(url, timeout=10):
+#               print(f"[net] GET {url}", flush=True)
+#               with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
+#                   data = r.read()
+#               print(f"[net] {url} -> {len(data)} bytes", flush=True)
+#               try:
+#                   info = json.loads(data).get("info", {})
+#                   print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+#               except Exception:
+#                   print(f"[net] non-JSON payload", flush=True)
 
-          def make_artifact(size_mb=8):
-              with tempfile.TemporaryDirectory() as td:
-                  raw = os.path.join(td, "blob.bin")
-                  gz  = raw + ".gz"
-                  with open(raw, "wb") as f:
-                      for _ in range(size_mb):
-                          f.write(os.urandom(1024*1024))
-                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
-                      shutil.copyfileobj(src, dst)
-                  h = hashlib.sha256()
-                  with open(gz, "rb") as f:
-                      for chunk in iter(lambda: f.read(1024*1024), b""):
-                          h.update(chunk)
-                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+#           def make_artifact(size_mb=8):
+#               with tempfile.TemporaryDirectory() as td:
+#                   raw = os.path.join(td, "blob.bin")
+#                   gz  = raw + ".gz"
+#                   with open(raw, "wb") as f:
+#                       for _ in range(size_mb):
+#                           f.write(os.urandom(1024*1024))
+#                   with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+#                       shutil.copyfileobj(src, dst)
+#                   h = hashlib.sha256()
+#                   with open(gz, "rb") as f:
+#                       for chunk in iter(lambda: f.read(1024*1024), b""):
+#                           h.update(chunk)
+#                   print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
 
-          def main():
-              print(f"[env] Python {sys.version.split()[0]}", flush=True)
-              start = time.monotonic()
-              for url in OK_URLS:
-                  fetch(url)
-              make_artifact(size_mb=8)
-              # Keep a bit of runtime to ensure capture sees traffic
-              while True:
-                  elapsed = int(time.monotonic() - start)
-                  if elapsed >= 55:
-                      break
-                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
-                  time.sleep(1)
-              print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
+#           def main():
+#               print(f"[env] Python {sys.version.split()[0]}", flush=True)
+#               start = time.monotonic()
+#               for url in OK_URLS:
+#                   fetch(url)
+#               make_artifact(size_mb=8)
+#               # Keep a bit of runtime to ensure capture sees traffic
+#               while True:
+#                   elapsed = int(time.monotonic() - start)
+#                   if elapsed >= 55:
+#                       break
+#                   print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+#                   time.sleep(1)
+#               print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
 
-          if __name__ == "__main__":
-              main()
-          EOF
+#           if __name__ == "__main__":
+#               main()
+#           EOF
 
-      - name: 📦 Download whitelist
-        uses: actions/download-artifact@v4
-        with:
-          name: whitelist.json
+#       - name: 📦 Download whitelist
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: whitelist.json
 
-      - name: 🎯 Try the whitelist
-        shell: bash
-        run: |
-          set -euo pipefail
-          # 1) Start the listener in tmux (run as root so it can open raw sockets)
-          tmux kill-session -t whitelist 2>/dev/null || true
-          tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' watch 50 \
-              --custom-whitelist whitelist.json > whitelist.log 2>&1"
-          # 2) Give it time to bind
-          sleep 5
-          # 3) Do the traffic you actually want whitelisted (during capture!)
-          python -m pip install --no-input requests
-          python build_ok.py
-          timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-          cat whitelist.log
-          if grep -Fqi "Policy violations detected" whitelist.log; then
-            cat whitelist.log
-            echo "==> Failed whitelist"
-            jq . whitelist.json
-            echo "❌ Policy violations detected"
-            exit 1
-          else
-            echo "✅ No policy violations detected"
-          fi
+#       - name: 🎯 Try the whitelist
+#         shell: bash
+#         run: |
+#           set -euo pipefail
+#           # 1) Start the listener in tmux (run as root so it can open raw sockets)
+#           tmux kill-session -t whitelist 2>/dev/null || true
+#           tmux new-session -d -s whitelist \
+#             "sudo -E '${{ steps.bin.outputs.path }}' watch 50 \
+#               --custom-whitelist whitelist.json > whitelist.log 2>&1"
+#           # 2) Give it time to bind
+#           sleep 5
+#           # 3) Do the traffic you actually want whitelisted (during capture!)
+#           python -m pip install --no-input requests
+#           python build_ok.py
+#           timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+#           cat whitelist.log
+#           if grep -Fqi "Policy violations detected" whitelist.log; then
+#             cat whitelist.log
+#             echo "==> Failed whitelist"
+#             jq . whitelist.json
+#             echo "❌ Policy violations detected"
+#             exit 1
+#           else
+#             echo "✅ No policy violations detected"
+#           fi
 
-  test_wrong_binary_whitelist_python_linux:
-    runs-on: ubuntu-latest
-    needs: populate_whitelist_python_linux
-    timeout-minutes: 30
-    env:
-      GH_TOKEN: ${{ github.token }}
-    permissions:
-      actions: write
-      contents: read
+#   test_wrong_binary_whitelist_python_linux:
+#     runs-on: ubuntu-latest
+#     needs: populate_whitelist_python_linux
+#     timeout-minutes: 30
+#     env:
+#       GH_TOKEN: ${{ github.token }}
+#     permissions:
+#       actions: write
+#       contents: read
 
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📦 Checkout
+#         uses: actions/checkout@v4
 
-      - name: 🦀 Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+#       - name: 🦀 Install Rust (nightly)
+#         uses: dtolnay/rust-toolchain@nightly
 
-      - name: 🧰 System deps (pcap, tmux, jq)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcap-dev tmux jq
+#       - name: 🧰 System deps (pcap, tmux, jq)
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libpcap-dev tmux jq
 
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+#       - name: 🐍 Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.10"
 
-      - name: ⚙️ Build sniffer (release)
-        run: cargo build --release
+#       - name: ⚙️ Build sniffer (release)
+#         run: cargo build --release
 
-      - name: 🔎 Find built binary paths
-        id: bin
-        shell: bash
-        run: |
-          set -euo pipefail
-          meta_json="$(cargo metadata --no-deps --format-version=1)"
-          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
-          if [[ -z "$bin_name" ]]; then
-            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
-            exit 1
-          fi
-          bin_path="target/release/$bin_name"
-          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
-          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
-          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
-      - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
-        run: |
-          cat > build_violation.py << 'EOF'
-          import json, time, sys, hashlib, tempfile, os, gzip, shutil
-          from urllib.request import urlopen, Request
+#       - name: 🔎 Find built binary paths
+#         id: bin
+#         shell: bash
+#         run: |
+#           set -euo pipefail
+#           meta_json="$(cargo metadata --no-deps --format-version=1)"
+#           bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+#           if [[ -z "$bin_name" ]]; then
+#             echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
+#             exit 1
+#           fi
+#           bin_path="target/release/$bin_name"
+#           [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+#           echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+#           echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+#       - name: 🚨 Build (adds non-whitelisted gist for CVE demo)
+#         run: |
+#           cat > build_violation.py << 'EOF'
+#           import json, time, sys, hashlib, tempfile, os, gzip, shutil
+#           from urllib.request import urlopen, Request
 
-          OK_URLS = [
-              "https://pypi.org/pypi/requests/json",   # package 1
-              "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
-          ]
+#           OK_URLS = [
+#               "https://pypi.org/pypi/requests/json",   # package 1
+#               "https://pypi.org/pypi/urllib3/json"     # package 2 (different package)
+#           ]
 
-          # This is the extra, out-of-whitelist URL you asked to include
-          GIST_URL = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
+#           # This is the extra, out-of-whitelist URL you asked to include
+#           GIST_URL = "https://gist.githubusercontent.com/gewashington/a4d0211e6f8601b69ff74e30d9e3ca20/raw/9d3e37cf7742b41e39606e70aab7a4f971353749/practice-python-fibonnaci.py"
 
-          def fetch(url, timeout=10):
-              print(f"[net] GET {url}", flush=True)
-              with urlopen(Request(url, headers={"User-Agent":"violation-demo"}), timeout=timeout) as r:
-                  data = r.read()
-              print(f"[net] {url} -> {len(data)} bytes", flush=True)
-              try:
-                  info = json.loads(data).get("info", {})
-                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
-              except Exception:
-                  print(f"[net] non-JSON payload", flush=True)
+#           def fetch(url, timeout=10):
+#               print(f"[net] GET {url}", flush=True)
+#               with urlopen(Request(url, headers={"User-Agent":"violation-demo"}), timeout=timeout) as r:
+#                   data = r.read()
+#               print(f"[net] {url} -> {len(data)} bytes", flush=True)
+#               try:
+#                   info = json.loads(data).get("info", {})
+#                   print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+#               except Exception:
+#                   print(f"[net] non-JSON payload", flush=True)
 
-          def make_artifact(size_mb=8):
-              with tempfile.TemporaryDirectory() as td:
-                  raw = os.path.join(td, "blob.bin")
-                  gz  = raw + ".gz"
-                  with open(raw, "wb") as f:
-                      for _ in range(size_mb):
-                          f.write(os.urandom(1024*1024))
-                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
-                      shutil.copyfileobj(src, dst)
-                  h = hashlib.sha256()
-                  with open(gz, "rb") as f:
-                      for chunk in iter(lambda: f.read(1024*1024), b""):
-                          h.update(chunk)
-                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+#           def make_artifact(size_mb=8):
+#               with tempfile.TemporaryDirectory() as td:
+#                   raw = os.path.join(td, "blob.bin")
+#                   gz  = raw + ".gz"
+#                   with open(raw, "wb") as f:
+#                       for _ in range(size_mb):
+#                           f.write(os.urandom(1024*1024))
+#                   with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+#                       shutil.copyfileobj(src, dst)
+#                   h = hashlib.sha256()
+#                   with open(gz, "rb") as f:
+#                       for chunk in iter(lambda: f.read(1024*1024), b""):
+#                           h.update(chunk)
+#                   print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
 
-          def main():
-              print(f"[env] Python {sys.version.split()[0]}", flush=True)
-              start = time.monotonic()
+#           def main():
+#               print(f"[env] Python {sys.version.split()[0]}", flush=True)
+#               start = time.monotonic()
 
-              for url in OK_URLS:
-                  fetch(url)
+#               for url in OK_URLS:
+#                   fetch(url)
 
-              # >>> This extra call should trigger your interceptor <<<
-              fetch(GIST_URL)
+#               # >>> This extra call should trigger your interceptor <<<
+#               fetch(GIST_URL)
 
-              make_artifact(size_mb=8)
+#               make_artifact(size_mb=8)
 
-              # Ensure total runtime >= 55s
-              while True:
-                  elapsed = int(time.monotonic() - start)
-                  if elapsed >= 30:
-                      break
-                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
-                  time.sleep(1)
+#               # Ensure total runtime >= 55s
+#               while True:
+#                   elapsed = int(time.monotonic() - start)
+#                   if elapsed >= 30:
+#                       break
+#                   print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+#                   time.sleep(1)
 
-              print(f"[done] Violation build finished in {time.monotonic()-start:.1f}s", flush=True)
+#               print(f"[done] Violation build finished in {time.monotonic()-start:.1f}s", flush=True)
 
-          if __name__ == "__main__":
-              main()
-          EOF
+#           if __name__ == "__main__":
+#               main()
+#           EOF
 
-      - name: 📦 Download whitelist
-        uses: actions/download-artifact@v4
-        with:
-          name: whitelist.json
+#       - name: 📦 Download whitelist
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: whitelist.json
 
-      - name: 🎯 Try the whitelist
-        shell: bash
-        run: |
-          set -euo pipefail
-          # 1) Start the listener in tmux (run as root so it can open raw sockets)
-          tmux kill-session -t whitelist 2>/dev/null || true
-          tmux new-session -d -s whitelist \
-            "sudo -E '${{ steps.bin.outputs.path }}' watch 45 \
-              --custom-whitelist whitelist.json > whitelist.log 2>&1"
-          # 2) Give it time to bind
-          sleep 5
-          # 3) Do the traffic you actually want whitelisted (during capture!)
-          python -m pip install --no-input requests
-          python build_violation.py
-          timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
-          cat whitelist.log
-          if grep -Fqi "Policy violations detected" whitelist.log; then
-            echo "==> Failed whitelist"
-            jq . whitelist.json
-            echo "✅ violations detected !"
-          else
-            echo "❌ No policy violations detected"
-            exit 1
-          fi
+#       - name: 🎯 Try the whitelist
+#         shell: bash
+#         run: |
+#           set -euo pipefail
+#           # 1) Start the listener in tmux (run as root so it can open raw sockets)
+#           tmux kill-session -t whitelist 2>/dev/null || true
+#           tmux new-session -d -s whitelist \
+#             "sudo -E '${{ steps.bin.outputs.path }}' watch 45 \
+#               --custom-whitelist whitelist.json > whitelist.log 2>&1"
+#           # 2) Give it time to bind
+#           sleep 5
+#           # 3) Do the traffic you actually want whitelisted (during capture!)
+#           python -m pip install --no-input requests
+#           python build_violation.py
+#           timeout "$(( 5 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+#           cat whitelist.log
+#           if grep -Fqi "Policy violations detected" whitelist.log; then
+#             echo "==> Failed whitelist"
+#             jq . whitelist.json
+#             echo "✅ violations detected !"
+#           else
+#             echo "❌ No policy violations detected"
+#             exit 1
+#           fi

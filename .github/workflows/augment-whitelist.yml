@@ -1,0 +1,155 @@
+name: Populate whitelist
+
+on:
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  augment_whitelist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🦀 Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: 🧰 System deps (pcap, tmux, jq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev tmux jq
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: ⚙️ Build sniffer (release)
+        run: cargo build --release
+
+      - name: 🔎 Find built binary paths
+        id: bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta_json="$(cargo metadata --no-deps --format-version=1)"
+          bin_name="$(jq -r '.packages[0].targets[] | select(.kind[] | contains("bin")) | .name' <<<"$meta_json" | head -n1)"
+          if [[ -z "$bin_name" ]]; then
+            echo "Couldn't infer binary name. Ensure this repo builds a binary target." >&2
+            exit 1
+          fi
+          bin_path="target/release/$bin_name"
+          [[ -x "$bin_path" ]] || { echo "Not found: $bin_path"; ls -la target/release; exit 1; }
+          echo "name=$bin_name" >> "$GITHUB_OUTPUT"
+          echo "path=$bin_path" >> "$GITHUB_OUTPUT"
+
+      - name: ✅ Build (whitelist PyPI packages)
+        run: |
+          cat > build_ok.py << 'EOF'
+          import json, time, sys, hashlib, tempfile, os, gzip, shutil
+          from urllib.request import urlopen, Request
+
+          OK_URLS = [
+              "https://pypi.org/pypi/requests/json",
+              "https://pypi.org/pypi/urllib3/json"
+          ]
+
+          def fetch(url, timeout=10):
+              print(f"[net] GET {url}", flush=True)
+              with urlopen(Request(url, headers={"User-Agent":"ok-demo"}), timeout=timeout) as r:
+                  data = r.read()
+              print(f"[net] {url} -> {len(data)} bytes", flush=True)
+              try:
+                  info = json.loads(data).get("info", {})
+                  print(f"[net] parsed: {info.get('name')} v{info.get('version')}", flush=True)
+              except Exception:
+                  print(f"[net] non-JSON payload", flush=True)
+
+          def make_artifact(size_mb=8):
+              with tempfile.TemporaryDirectory() as td:
+                  raw = os.path.join(td, "blob.bin")
+                  gz  = raw + ".gz"
+                  with open(raw, "wb") as f:
+                      for _ in range(size_mb):
+                          f.write(os.urandom(1024*1024))
+                  with open(raw, "rb") as src, gzip.open(gz, "wb") as dst:
+                      shutil.copyfileobj(src, dst)
+                  h = hashlib.sha256()
+                  with open(gz, "rb") as f:
+                      for chunk in iter(lambda: f.read(1024*1024), b""):
+                          h.update(chunk)
+                  print(f"[artifact] {gz} sha256={h.hexdigest()}", flush=True)
+
+          def main():
+              print(f"[env] Python {sys.version.split()[0]}", flush=True)
+              start = time.monotonic()
+              for url in OK_URLS:
+                  fetch(url)
+              make_artifact(size_mb=8)
+              # Keep a bit of runtime to ensure capture sees traffic
+              while True:
+                  elapsed = int(time.monotonic() - start)
+                  if elapsed >= 30:
+                      break
+                  print(f"[wait] {elapsed}s elapsed, {30-elapsed}s remaining…", flush=True)
+                  time.sleep(1)
+              print(f"[done] OK build finished in {time.monotonic()-start:.1f}s", flush=True)
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
+      - name: 🎯 Start capture and generate traffic to create the whitelist
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 1) Start the listener in tmux (run as root so it can open raw sockets)
+          tmux kill-session -t whitelist 2>/dev/null || true
+          tmux new-session -d -s whitelist \
+            "sudo -E '${{ steps.bin.outputs.path }}' create-whitelist 30 true \
+              --file whitelist.json > whitelist-entry.log 2>&1"
+          # 2) Give it time to bind
+          sleep 5
+          # 3) Do the traffic you actually want whitelisted (during capture!)
+          python -m pip install --no-input requests
+          python build_ok.py
+          # 4) Wait for capture to finish
+          echo "Waiting for listener to finish (up to 5s + grace)…"
+          timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
+          tmux kill-session -t whitelist 2>/dev/null || true
+
+      - name: Resolve which file to upload
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="whitelist.json"
+          base="${base##*/}"              # just the filename
+          [[ "$base" == *.json ]] || base="${base}.json"
+          aug="augment-$base"
+
+          if [[ -f "$aug" ]]; then
+            chosen="$aug"
+          elif [[ -f "$base" ]]; then
+            chosen="$base"
+          else
+            echo "::error title=Missing file::Neither '$aug' nor '$base' exists."
+            exit 1
+          fi
+
+          # outputs
+          echo "file=$chosen" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$(basename "$chosen")" >> "$GITHUB_OUTPUT"
+
+      - name: 📦 Upload whitelist
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.artifact_name }}
+          path: ${{ steps.resolve.outputs.file }}

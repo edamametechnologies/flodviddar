@@ -9,6 +9,11 @@ use flodbadd::{
     sessions::format_sessions_log,
 };
 use tokio::time::sleep;
+use tracing::info;
+
+use crate::github::GithubApi;
+
+mod github;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -384,28 +389,65 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
     tracing::info!("Capturing traffic for whitelist creation ({}s)", seconds);
     sleep(Duration::from_secs(seconds)).await;
 
-    // If augmenting and file path provided & exists, load existing JSON first
-    if augment {
-        if let Some(path) = output_path {
-            if std::path::Path::new(path).exists() {
-                let existing = std::fs::read_to_string(path)?;
-                capture.set_custom_whitelists(&existing).await;
+    match augment {
+        true => {
+            // check if the user give a file
+            if let Some(path) = output_path {
+                if std::path::Path::new(path).exists() {
+                    // Path exist so we set the current whitelist
+                    let existing = std::fs::read_to_string(path)?;
+                    capture.set_custom_whitelists(&existing).await;
+                } else {
+                    // Path dont exist we gonna try to see if the whitelist is in the artifact
+                    let github_cli = GithubApi::new();
+                    let whitelist = github_cli
+                        .get_whitelist_artifact(path)
+                        .await
+                        .expect("Failed to get whitelist from artifact");
+                    capture.set_custom_whitelists(&whitelist).await;
+                }
+            }
+            // TODO: ask to frank but the path should be mandatory
+            let path = output_path.unwrap();
+            let (whitelist_json, pourcentage_of_change) =
+                capture.augment_custom_whitelists().await?;
+            if pourcentage_of_change > 0.0 {
+                let name_whitelist = format!("augment_{}.json", path);
+                // The custom whitelist augment of pourcentage_of_change
+                info!(
+                    "The custom whitelist augment of {}% we need to give it another try",
+                    pourcentage_of_change
+                );
+                // Write the file to be able to upload
+                std::fs::write(name_whitelist.clone(), &whitelist_json)?;
+                println!("Augment Whitelist written to {}", name_whitelist);
+            } else {
+                println!("No new entries added to the custom whitelist");
             }
         }
-    }
-
-    let json = if augment {
-        capture.augment_custom_whitelists().await?
-    } else {
-        capture.create_custom_whitelists().await?
+        false => {
+            let whitelist_json = capture.create_custom_whitelists().await?;
+            if let Some(path) = output_path {
+                std::fs::write(path, &whitelist_json)?;
+                println!("Whitelist written to {}", path);
+            } else {
+                println!("{:?}", whitelist_json);
+            }
+        }
     };
 
-    if let Some(path) = output_path {
-        std::fs::write(path, &json)?;
-        println!("Whitelist written to {}", path);
-    } else {
-        println!("{}", json);
-    }
+    // let json = if augment {
+    //     capture.augment_custom_whitelists().await?
+    // } else {
+    //     capture.create_custom_whitelists().await?
+    // };
+
+    // if let Some(path) = output_path {
+    //     std::fs::write(path, &json)?;
+    //     println!("Whitelist written to {}", path);
+    // } else {
+    //     println!("{}", json);
+    // }
 
     Ok(())
 }
