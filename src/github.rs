@@ -90,10 +90,10 @@ impl GithubApi {
         let get_all_artifacts = self.get_all_artifacts().await?;
         // Find the artifacts id and download it
         for artifact in get_all_artifacts {
-            if artifact.name == artifact_name {
-                println!("Found artifact: {}", artifact.name);
-                return self.get_whitelist(artifact.id).await;
-            }
+            // if artifact.name == artifact_name {
+            //     println!("Found artifact: {}", artifact.name);
+            //     return self.get_whitelist(artifact.id).await;
+            // }
             // Check if a augment file is present
             if artifact.name == format!("augment_{}.json", artifact_name) {
                 println!("Found augment artifact: {}", artifact.name);

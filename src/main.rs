@@ -393,17 +393,17 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
         true => {
             // check if the user give a file
             if let Some(path) = output_path {
-                if std::path::Path::new(path).exists() {
+                let github_cli = GithubApi::new();
+                let whitelist = github_cli
+                    .get_whitelist_artifact(path)
+                    .await
+                    .expect("Failed to get whitelist from artifact");
+                if std::path::Path::new(path).exists() && whitelist.is_empty() {
                     // Path exist so we set the current whitelist
                     let existing = std::fs::read_to_string(path)?;
                     capture.set_custom_whitelists(&existing).await;
                 } else {
                     // Path dont exist we gonna try to see if the whitelist is in the artifact
-                    let github_cli = GithubApi::new();
-                    let whitelist = github_cli
-                        .get_whitelist_artifact(path)
-                        .await
-                        .expect("Failed to get whitelist from artifact");
                     println!("Using whitelist from artifact: {}", whitelist);
                     capture.set_custom_whitelists(&whitelist).await;
                 }
@@ -413,7 +413,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
             let (whitelist_json, pourcentage_of_change) =
                 capture.augment_custom_whitelists().await?;
             if pourcentage_of_change > 0.0 {
-                let name_whitelist = format!("augment_{}.json", path);
+                let name_whitelist = format!("augment_{}", path);
                 // The custom whitelist augment of pourcentage_of_change
                 println!(
                     "The custom whitelist augment of {}% we need to give it another try",
