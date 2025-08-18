@@ -398,6 +398,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
                     .get_whitelist_artifact(path)
                     .await
                     .expect("Failed to get whitelist from artifact");
+                println!("TOTO: {}", whitelist);
                 if std::path::Path::new(path).exists() && whitelist.is_empty() {
                     // Path exist so we set the current whitelist
                     println!("Using existing whitelist from path: {}", path);
@@ -429,6 +430,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
                     .await
                     .expect("Rerun the pipeline");
             } else {
+                // TODO: delete refine artifact
                 println!("No new entries added to the custom whitelist");
             }
         }
