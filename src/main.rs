@@ -404,6 +404,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
                         .get_whitelist_artifact(path)
                         .await
                         .expect("Failed to get whitelist from artifact");
+                    println!("Using whitelist from artifact: {}", whitelist);
                     capture.set_custom_whitelists(&whitelist).await;
                 }
             }
@@ -414,7 +415,7 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
             if pourcentage_of_change > 0.0 {
                 let name_whitelist = format!("augment_{}.json", path);
                 // The custom whitelist augment of pourcentage_of_change
-                info!(
+                println!(
                     "The custom whitelist augment of {}% we need to give it another try",
                     pourcentage_of_change
                 );
