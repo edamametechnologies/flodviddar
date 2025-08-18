@@ -125,6 +125,7 @@ jobs:
           timeout "$(( 60 ))" bash -c 'while tmux has-session -t whitelist 2>/dev/null; do sleep 1; done' || true
           tmux kill-session -t whitelist 2>/dev/null || true
           cat flodviddar.log
+          cat augment_whitelist.json
 
       - name: Resolve which file to upload
         id: resolve
