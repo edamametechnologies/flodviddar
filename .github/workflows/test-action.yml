@@ -1,0 +1,61 @@
+name: Test
+
+on:
+  schedule:
+    # Run daily at 01:00 UTC
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev"
+      - "main"
+  pull_request:
+
+# Auto cancel previous runs if they were not completed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Declare default permissions as read only.
+permissions: read-all
+
+jobs:
+  test-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Regular OS tests
+          - os: ubuntu-latest
+            arch: x86_64
+            target: x86_64-unknown-linux-gnu
+          # - os: macos-latest
+          #   arch: x86_64
+          # - os: windows-latest
+          #   arch: x86_64
+          # Linux aarch64 tests using QEMU
+          - os: ubuntu-latest
+            arch: aarch64
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      # Set up QEMU for aarch64 emulation
+      - name: Set up QEMU
+        if: matrix.arch == 'aarch64'
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      # We don't use the EDAMAME Posture Action here, because we want to fully test the action.yml file
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Test start
+      - name: Test start
+        id: test-start
+        uses: ./ # Use the local action definition (action.yaml)
+        with:
+          edamame_user: ${{ vars.EDAMAME_POSTURE_USER }}
+        continue-on-error: true
