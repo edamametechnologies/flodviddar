@@ -59,3 +59,10 @@ jobs:
         with:
           edamame_user: ${{ vars.EDAMAME_POSTURE_USER }}
         continue-on-error: true
+
+      - name: ls
+        run: ls -la
+
+      - name: execute
+        run: |
+          ./flodviddar watch 15
