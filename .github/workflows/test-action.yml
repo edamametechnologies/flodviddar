@@ -65,4 +65,4 @@ jobs:
 
       - name: execute
         run: |
-          ./flodviddar watch 15
+          ./flodviddar create-whitelist 10 true --file toto.json
