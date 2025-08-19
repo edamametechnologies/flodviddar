@@ -1,0 +1,266 @@
+name: "Setup Flodviddar"
+description: "Setup the Flodviddar environment and run the necessary commands to get started."
+inputs:
+  auto_whitelist:
+    description: "Automatically whitelist the Flodviddar environment."
+    required: false
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Dependencies
+      run: |
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          # Define function to wait for apt locks
+          wait_for_apt_locks() {
+            echo "Checking for apt lists lock..."
+            TIMEOUT=300
+            TIME_PASSED=0
+            
+            # Only check the lists lock file
+            LOCK_FILE="/var/lib/apt/lists/lock"
+            
+            while sudo fuser "$LOCK_FILE" >/dev/null 2>&1; do
+              echo "Waiting for apt lists lock to be released..."
+              sleep 5
+              TIME_PASSED=$((TIME_PASSED + 5))
+              if [ $TIME_PASSED -ge $TIMEOUT ]; then
+                echo "Timed out waiting for apt lists lock after $TIMEOUT seconds."
+                exit 1
+              fi
+            done
+            
+            echo "No apt lists lock held, proceeding..."
+          }
+          
+          # Avoid prompts during apt-get install
+          export DEBIAN_FRONTEND=noninteractive
+          
+          # Install sudo if needed
+          if ! command -v sudo &> /dev/null; then
+            echo "Installing sudo..."
+            # Wait for apt lock before any operations
+            wait_for_apt_locks
+            apt-get update -y
+            wait_for_apt_locks
+            apt-get install -y --no-install-recommends sudo
+            
+            # Wait again after installing sudo
+            wait_for_apt_locks
+          fi          
+          # Update package lists
+          echo "Updating package lists..."
+          wait_for_apt_locks
+          sudo -E apt-get update
+
+          # Check/install git
+          if ! command -v git &> /dev/null; then
+            echo "Installing git..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y git
+          fi
+
+          # Check/install gh
+          if ! command -v gh &> /dev/null; then
+            echo "Installing gh..."
+            wait_for_apt_locks
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+              && sudo mkdir -p -m 755 /etc/apt/keyrings \
+                    && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+                    && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+              && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+              && sudo apt update \
+              && sudo apt install gh -y
+          fi
+
+          # Check/install wget
+          if ! command -v wget &> /dev/null; then
+            echo "Installing wget..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y wget
+          fi
+
+          # Check/install curl
+          if ! command -v curl &> /dev/null; then
+            echo "Installing curl..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y curl
+          fi
+
+          # Check/install jq
+          if ! command -v jq &> /dev/null; then
+            echo "Installing jq..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y jq
+          fi
+
+          # Check/install libpcap0.8t64
+          if ! dpkg -s libpcap0.8t64 &> /dev/null; then
+            echo "Installing libpcap0.8t64..."
+            wait_for_apt_locks
+            # Install libpcap0.8t64 if available, otherwise install libpcap0.8
+            if ! sudo -E apt-get install -y libpcap0.8t64  &> /dev/null; then
+              echo "Failed to install libpcap0.8t64, using libpcap0.8 instead"
+              if ! dpkg -s libpcap0.8 &> /dev/null; then
+                echo "Installing libpcap0.8..."
+                wait_for_apt_locks
+                sudo -E apt-get install -y libpcap0.8
+              fi
+            fi
+          fi
+
+          # Check/install build-essential
+          if ! dpkg -s build-essential &> /dev/null; then
+            echo "Installing build-essential..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y build-essential
+          fi
+
+          # Check/install node + npm
+          if ! command -v node &> /dev/null; then
+            echo "Installing node + npm..."
+            wait_for_apt_locks
+            sudo -E apt-get install -y nodejs npm
+          fi
+        fi
+      shell: bash
+
+    - name: Download Flodviddar binary
+      id: download_binary
+      run: |
+        JQ=jq
+        echo "jq version: $($JQ --version)"
+
+        # --- Determine Latest Version via Redirect ---
+        LATEST_VERSION=""
+        echo "Attempting to get latest version via redirect..."
+        REDIRECT_OUTPUT=$(curl -s -L -I -o /dev/null -w '%{url_effective}:%{http_code}' https://github.com/edamametechnologies/flodviddar/releases/latest)
+
+        # Extract status code (part after the last colon) using bash parameter expansion
+        HTTP_STATUS="${REDIRECT_OUTPUT##*:}"
+        # Extract URL (part before the last colon and the status code) using bash parameter expansion
+        LATEST_RELEASE_URL="${REDIRECT_OUTPUT%:$HTTP_STATUS}"
+
+        echo "Redirect URL: $LATEST_RELEASE_URL"
+        echo "HTTP Status: $HTTP_STATUS"
+
+        if [[ "$HTTP_STATUS" == "200" && "$LATEST_RELEASE_URL" == *"/releases/tag/"* ]]; then
+          LATEST_VERSION=$(basename "$LATEST_RELEASE_URL")
+          LATEST_VERSION=${LATEST_VERSION#v} # Remove v prefix
+          echo "Latest version found via redirect: $LATEST_VERSION"
+        else
+          echo "Failed to get latest version via redirect (Status: $HTTP_STATUS, URL: $LATEST_RELEASE_URL). Will try API fallback."
+        fi
+
+        # --- Determine Fallback Version via API ---
+        API_FALLBACK_VERSION=""
+        HARDCODED_FALLBACK_VERSION="0.9.24" # Define hardcoded fallback
+        echo "Attempting to get fallback version via API..."
+        WAIT_TIME=5
+        for i in {1..3}; do # Limit retries
+          FALLBACK_API_RESPONSE=$(curl -s https://api.github.com/repos/edamametechnologies/edamame_posture_cli/releases)
+          
+          # Check for rate limit first
+          if echo "$FALLBACK_API_RESPONSE" | grep -qi "API rate limit exceeded"; then
+            WAIT_TIME=$((WAIT_TIME * 2))
+            if [[ $WAIT_TIME -gt 60 ]]; then WAIT_TIME=60; fi # Cap wait time
+            echo "API rate limit exceeded for fallback, sleeping for $WAIT_TIME seconds (Attempt $i)"
+            sleep $WAIT_TIME
+          # If not rate limited, check if response is valid and has enough data
+          elif echo "$FALLBACK_API_RESPONSE" | $JQ -e '. | length > 1' > /dev/null; then
+            # Get the tag name of the second non-draft, non-prerelease release
+            API_FALLBACK_VERSION=$($JQ -r '[.[] | select(.draft==false and .prerelease==false)][1].tag_name' <<< "$FALLBACK_API_RESPONSE")
+            if [[ -n "$API_FALLBACK_VERSION" && "$API_FALLBACK_VERSION" != "null" ]]; then
+                API_FALLBACK_VERSION=${API_FALLBACK_VERSION#v} # Remove v prefix
+                echo "Fallback version found via API: $API_FALLBACK_VERSION"
+                break # Success, exit loop
+            else
+                echo "Could not extract a valid second latest tag from API response (Attempt $i). JQ filter returned null or empty."
+                # Log beginning of response for debugging
+                echo "API Response (start): $(echo "$FALLBACK_API_RESPONSE" | head -c 100)..."
+                API_FALLBACK_VERSION=""
+                sleep 5 # Short sleep before retry on parsing error
+            fi
+          # If not rate limited and response is not valid/sufficient
+          else 
+            echo "Invalid API response for fallback (Attempt $i). Not rate limit, and not valid JSON or insufficient releases."
+            # Log beginning of response for debugging
+            echo "API Response (start): $(echo "$FALLBACK_API_RESPONSE" | head -c 100)..."
+            API_FALLBACK_VERSION=""
+            sleep 5 # Short sleep before retry on other errors
+          fi
+        done
+
+        if [[ -z "$API_FALLBACK_VERSION" ]]; then
+          echo "Failed to get fallback version from API after retries."
+        fi
+
+        # --- Set VERSION and FALLBACK_VERSION for Download ---
+        if [[ -n "$LATEST_VERSION" ]]; then
+          VERSION="$LATEST_VERSION"
+          if [[ -n "$API_FALLBACK_VERSION" ]]; then
+            FALLBACK_VERSION="$API_FALLBACK_VERSION"
+          else
+            echo "Using hardcoded fallback version as API fallback failed."
+            FALLBACK_VERSION="$HARDCODED_FALLBACK_VERSION"
+          fi
+        else
+          # Latest version via redirect failed
+          if [[ -n "$API_FALLBACK_VERSION" ]]; then
+            echo "Using API fallback version as primary version."
+            VERSION="$API_FALLBACK_VERSION"
+            FALLBACK_VERSION="$HARDCODED_FALLBACK_VERSION"
+          else
+            echo "Both redirect and API failed. Using hardcoded versions."
+            VERSION="$HARDCODED_FALLBACK_VERSION"
+            FALLBACK_VERSION="$HARDCODED_FALLBACK_VERSION"
+          fi
+        fi
+
+        echo "VERSION to download: $VERSION"
+        echo "FALLBACK_VERSION to download: $FALLBACK_VERSION"
+
+        # On Linux we also provide a deb package to have it installed in /usr/bin
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          # Binary is not present, check if we have a minimum version of GLIBC installed
+          echo "Binary is not present, we will download the binary based on the GLIBC version"
+          MIN_GLIBC_VERSION="2.29"
+          echo "Minimum required GLIBC version: $MIN_GLIBC_VERSION"
+          if command -v getconf >/dev/null 2>&1; then
+            echo "Using getconf to determine GLIBC version"
+            GLIBC_VERSION=$(getconf GNU_LIBC_VERSION | awk '{print $2}')
+            echo "Detected GLIBC version: $GLIBC_VERSION"
+            # Compare versions using sort
+            if printf '%s\n%s\n' "$MIN_GLIBC_VERSION" "$GLIBC_VERSION" | sort -V | head -n 1 | grep -q "$MIN_GLIBC_VERSION"; then
+              echo "GLIBC version $GLIBC_VERSION is sufficient (minimum required: $MIN_GLIBC_VERSION)"
+              echo "Downloading x86_64-unknown-linux-gnu version of Flodviddar binary for Linux..."
+              wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${VERSION}/flodviddar-${VERSION}-x86_64-unknown-linux-gnu -O flodviddar || \
+              wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${FALLBACK_VERSION}/flodviddar-${FALLBACK_VERSION}-x86_64-unknown-linux-gnu -O flodviddar
+            else
+              echo "Warning: GLIBC version $GLIBC_VERSION is older than minimum required version $MIN_GLIBC_VERSION"
+              echo "Fallback to using x86_64-unknown-linux-musl version of the binary"
+              echo "Downloading x86_64-unknown-linux-musl version of Flodviddar binary for Linux..."
+              wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${VERSION}/flodviddar-${VERSION}-x86_64-unknown-linux-musl -O flodviddar || \
+              wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${FALLBACK_VERSION}/flodviddar-${FALLBACK_VERSION}-x86_64-unknown-linux-musl -O flodviddar
+            fi
+          else
+            echo "Unable to detect GLIBC version, getconf command not found"
+            exit 1
+          fi
+          chmod u+x flodviddar
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          echo "Downloading Flodviddar binary for macOS..."
+          wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${VERSION}/flodviddar-${VERSION}-universal-apple-darwin -O flodviddar || \
+          wget --no-verbose https://github.com/edamametechnologies/flodviddar/releases/download/v${FALLBACK_VERSION}/flodviddar-${FALLBACK_VERSION}-universal-apple-darwin -O flodviddar
+          chmod u+x flodviddar
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          echo "Downloading Flodviddar binary for Windows..."
+          wget --no-verbose https://github.com/edamametechnologies/flodviddar_cli/releases/download/v${VERSION}/flodviddar-${VERSION}-x86_64-pc-windows-msvc.exe -O flodviddar.exe || \
+          wget --no-verbose https://github.com/edamametechnologies/flodviddar_cli/releases/download/v${FALLBACK_VERSION}/flodviddar-${FALLBACK_VERSION}-x86_64-pc-windows-msvc.exe -O flodviddar.exe
+        else
+          echo "Unsupported OS: $RUNNER_OS"
+          exit 1
+        fi
+      shell: bash
