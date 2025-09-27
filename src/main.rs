@@ -395,7 +395,8 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
     }
 
     let json = if augment {
-        capture.augment_custom_whitelists().await?
+        let (json, _) = capture.augment_custom_whitelists().await?;
+        json
     } else {
         capture.create_custom_whitelists().await?
     };
