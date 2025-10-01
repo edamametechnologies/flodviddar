@@ -63,9 +63,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.11"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "862ed96ca487e809f1c8e5a8447f6ee2cf102f846893800b20cebdf541fc6bbd"
+checksum = "5192cca8006f1fd4f7237516f40fa183bb07f8fbdfedaa0036de5ea9b0b45e78"
 
 [[package]]
 name = "anstyle-parse"
@@ -975,7 +975,7 @@ dependencies = [
 [[package]]
 name = "extended-isolation-forest"
 version = "0.2.3"
-source = "git+https://github.com/edamametechnologies/extended-isolation-forest#3322001b5ce73b44534f1ef9f096b11bd2aa7bf8"
+source = "git+https://github.com/edamametechnologies/extended-isolation-forest?branch=main#b373e9dd5681447d5fff50c106a73ec2ee0f4377"
 dependencies = [
  "num-traits",
  "rand 0.8.5",
@@ -1047,8 +1047,8 @@ dependencies = [
 
 [[package]]
 name = "flodbadd"
-version = "0.9.68"
-source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#2028aec91dd7fd5415ea1059769fd90aa30a8fde"
+version = "0.9.69"
+source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#bea93503e0d77ca425afb17e56c3d2e6a68c4edf"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4331,9 +4331,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"
+checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
 dependencies = [
  "zeroize_derive",
 ]
