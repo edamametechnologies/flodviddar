@@ -1,9 +1,25 @@
+# Static linking for Windows
+[target.'cfg(target_os = "windows")']
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-L/usr/local/musl/usr/lib"]
+
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-L/usr/local/musl/usr/lib"]
+
+[target.x86_64-unknown-linux-gnu]
+linker = "x86_64-linux-gnu-gcc"
+
 [target.i686-unknown-linux-gnu]
 linker = "i686-linux-gnu-gcc"
 
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
+objcopy = { path = "aarch64-linux-gnu-objcopy" }
+strip = { path = "aarch64-linux-gnu-strip" }
 
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
-
+objcopy = { path = "arm-linux-gnueabihf-objcopy" }
+strip = { path = "arm-linux-gnueabihf-strip" }
