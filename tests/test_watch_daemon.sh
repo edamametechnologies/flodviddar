@@ -28,15 +28,24 @@ log_warn() {
 }
 
 cleanup() {
-    # Kill any running flodviddar processes (suppress all output)
-    sudo pkill -f flodviddar 2>/dev/null || true
+    # Disable exit on error for cleanup
+    set +e
+    
+    # Kill any running flodviddar processes (suppress all output and errors)
+    sudo pkill -f flodviddar >/dev/null 2>&1
+    local pkill_exit=$?
+    
     sleep 1
-    rm -rf "$TEST_DIR" 2>/dev/null || true
-    # Always return 0 to not interfere with test exit code
+    rm -rf "$TEST_DIR" >/dev/null 2>&1
+    
+    # Re-enable exit on error if it was set
+    set -e
+    
+    # Always return 0 from cleanup to not interfere with test exit code
     return 0
 }
 
-# Note: trap runs cleanup but doesn't change exit code
+# Cleanup on exit but preserve exit code
 trap cleanup EXIT
 
 build_flodviddar() {
