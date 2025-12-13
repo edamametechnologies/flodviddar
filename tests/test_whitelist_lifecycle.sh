@@ -46,12 +46,25 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Build flodviddar
+# Build or locate flodviddar binary
 build_flodviddar() {
+    # Check if binary already exists (from CI build step)
+    if [[ -f "$PROJECT_ROOT/target/release/flodviddar" ]]; then
+        FLODVIDDAR_BIN="$PROJECT_ROOT/target/release/flodviddar"
+        log_info "Using pre-built binary"
+        return 0
+    fi
+    
+    # Build from source
     log_info "Building flodviddar from source..."
     cd "$PROJECT_ROOT"
     
-    cargo build --release 2>&1 | tee /tmp/flodviddar_build.log | grep -E "(Compiling|Finished|error)" || true
+    if command -v cargo &> /dev/null; then
+        cargo build --release 2>&1 | tee /tmp/flodviddar_build.log | grep -E "(Compiling|Finished|error)" || true
+    else
+        log_error "Cargo not found and no pre-built binary available"
+        exit 1
+    fi
     
     FLODVIDDAR_BIN="$PROJECT_ROOT/target/release/flodviddar"
     
