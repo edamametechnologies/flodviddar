@@ -28,14 +28,15 @@ log_warn() {
 }
 
 cleanup() {
-    log_info "Cleaning up..."
     # Kill any running flodviddar processes (suppress all output)
     sudo pkill -f flodviddar 2>/dev/null || true
     sleep 1
     rm -rf "$TEST_DIR" 2>/dev/null || true
+    # Always return 0 to not interfere with test exit code
     return 0
 }
 
+# Note: trap runs cleanup but doesn't change exit code
 trap cleanup EXIT
 
 build_flodviddar() {
@@ -183,17 +184,22 @@ main() {
     echo "========================================"
     echo ""
     
-    build_flodviddar || exit 1
-    setup_test || exit 1
-    create_baseline || exit 1
-    test_watch_daemon || exit 1
+    build_flodviddar || return 1
+    setup_test || return 1
+    create_baseline || return 1
+    test_watch_daemon || return 1
     
     echo ""
     echo "========================================"
     echo "  TEST COMPLETE"
     echo "========================================"
+    return 0
 }
 
+# Run main and capture its exit code
 main
-exit 0
+MAIN_EXIT=$?
+
+# Explicitly exit with main's exit code
+exit $MAIN_EXIT
 
