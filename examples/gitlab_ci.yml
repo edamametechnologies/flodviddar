@@ -1,0 +1,144 @@
+# Example GitLab CI Pipeline using Flodviddar
+# Demonstrates whitelist lifecycle in GitLab CI/CD
+
+stages:
+  - build
+  - test
+  - security
+
+variables:
+  WHITELIST_FILE: "whitelist.json"
+  CAPTURE_DURATION: "120"
+
+# Build Flodviddar binary (cache for reuse)
+build_flodviddar:
+  stage: build
+  image: rust:latest
+  before_script:
+    - apt-get update
+    - apt-get install -y libpcap-dev
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/flodviddar
+    expire_in: 1 hour
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+
+# Security scan with Flodviddar
+security_scan:
+  stage: security
+  image: ubuntu:latest
+  dependencies:
+    - build_flodviddar
+  before_script:
+    - apt-get update
+    - apt-get install -y libpcap-dev jq bc python3 python3-requests
+  script:
+    - export FLODVIDDAR_BIN="$PWD/target/release/flodviddar"
+    - chmod +x "$FLODVIDDAR_BIN"
+    
+    # Download previous whitelist (if exists)
+    - |
+      if [[ -f "$WHITELIST_FILE" ]]; then
+        echo "Using existing whitelist from artifacts"
+        AUGMENT_MODE="true"
+      else
+        echo "No previous whitelist, creating baseline"
+        AUGMENT_MODE="false"
+      fi
+    
+    # Start capture before build/test
+    - |
+      sudo $FLODVIDDAR_BIN create-whitelist $CAPTURE_DURATION $AUGMENT_MODE \
+        --file $WHITELIST_FILE > capture.log 2>&1 &
+      CAPTURE_PID=$!
+      sleep 5
+    
+    # YOUR BUILD/TEST COMMANDS HERE
+    - echo "Running build and tests..."
+    - npm install || true
+    - npm test || true
+    
+    # Wait for capture to complete
+    - wait $CAPTURE_PID || true
+    
+    # Analyze results
+    - |
+      ENDPOINT_COUNT=$(jq '[.whitelists[]? | .endpoints? // [] | length] | add // 0' $WHITELIST_FILE)
+      echo "Whitelist now contains $ENDPOINT_COUNT endpoints"
+    
+    # Final enforcement scan
+    - |
+      if [[ -f "$WHITELIST_FILE" ]]; then
+        echo "Running final enforcement scan..."
+        sudo $FLODVIDDAR_BIN scan 30 \
+          --custom-whitelist $WHITELIST_FILE \
+          --output report > violations.json 2>&1 || true
+        
+        VIOLATION_COUNT=$(jq 'length' violations.json 2>/dev/null || echo "0")
+        if [[ "$VIOLATION_COUNT" -gt 0 ]]; then
+          echo "WARNING: $VIOLATION_COUNT violations detected"
+          jq -r '.[] | "  - \(.dst_domain // .session.dst_ip):\(.session.dst_port)"' violations.json
+        fi
+      fi
+  
+  artifacts:
+    paths:
+      - $WHITELIST_FILE
+      - violations.json
+    reports:
+      dotenv: build.env
+    expire_in: 30 days
+
+# Alternative: Watch daemon mode (for long-running pipelines)
+security_watch:
+  stage: security
+  image: ubuntu:latest
+  dependencies:
+    - build_flodviddar
+  before_script:
+    - apt-get update
+    - apt-get install -y libpcap-dev jq python3-requests
+  script:
+    - export FLODVIDDAR_BIN="$PWD/target/release/flodviddar"
+    - chmod +x "$FLODVIDDAR_BIN"
+    
+    # Download whitelist
+    - |
+      if [[ ! -f "$WHITELIST_FILE" ]]; then
+        echo "ERROR: Watch mode requires an existing whitelist"
+        exit 1
+      fi
+    
+    # Start watch daemon in background
+    - |
+      sudo $FLODVIDDAR_BIN watch 30 \
+        --custom-whitelist $WHITELIST_FILE \
+        > watch.log 2>&1 &
+      WATCH_PID=$!
+      echo "Watch daemon started (PID: $WATCH_PID)"
+    
+    # YOUR LONG-RUNNING BUILD/TEST COMMANDS
+    - sleep 120  # Placeholder for your actual work
+    
+    # Stop daemon
+    - sudo kill -TERM $WATCH_PID || true
+    - wait $WATCH_PID || true
+    
+    # Check logs
+    - |
+      if grep -q "Policy violations detected" watch.log; then
+        echo "FAILURE: Violations detected"
+        cat watch.log
+        exit 1
+      fi
+  
+  artifacts:
+    when: always
+    paths:
+      - watch.log
+
