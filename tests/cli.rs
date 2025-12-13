@@ -1,5 +1,6 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::CommandCargoExt;
 use predicates::str::contains;
+use std::process::Command;
 
 #[test]
 fn help_displays() {
