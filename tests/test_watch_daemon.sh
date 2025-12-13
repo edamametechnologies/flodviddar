@@ -29,9 +29,11 @@ log_warn() {
 
 cleanup() {
     log_info "Cleaning up..."
-    # Kill any running flodviddar processes
-    sudo pkill -f flodviddar || true
-    rm -rf "$TEST_DIR"
+    # Kill any running flodviddar processes (suppress all output)
+    sudo pkill -f flodviddar 2>/dev/null || true
+    sleep 1
+    rm -rf "$TEST_DIR" 2>/dev/null || true
+    return 0
 }
 
 trap cleanup EXIT
@@ -173,18 +175,17 @@ main() {
     echo "========================================"
     echo ""
     
-    build_flodviddar
-    setup_test
-    create_baseline
-    test_watch_daemon
+    build_flodviddar || exit 1
+    setup_test || exit 1
+    create_baseline || exit 1
+    test_watch_daemon || exit 1
     
     echo ""
     echo "========================================"
     echo "  TEST COMPLETE"
     echo "========================================"
-    
-    exit 0
 }
 
 main
+exit 0
 

@@ -72,11 +72,15 @@ run_test() {
     log_test "Running: $test_name"
     echo "----------------------------------------"
     
-    if bash "$test_script"; then
+    # Run test and capture exit code
+    bash "$test_script"
+    local exit_code=$?
+    
+    if [[ $exit_code -eq 0 ]]; then
         log_info "$test_name: PASSED"
         return 0
     else
-        log_error "$test_name: FAILED"
+        log_error "$test_name: FAILED (exit code: $exit_code)"
         return 1
     fi
 }
