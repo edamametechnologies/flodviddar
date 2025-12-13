@@ -1,0 +1,131 @@
+name: Test Cancel on Violation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main', 'dev']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  test-cancellation:
+    name: Test Pipeline Cancellation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev jq bc python3-pip
+          pip3 install requests
+      
+      - name: Build flodviddar
+        run: cargo build --release
+      
+      - name: Create baseline whitelist
+        run: |
+          # Create a minimal whitelist that allows GitHub but not example.com
+          cat > whitelist.json << 'EOF'
+          {
+            "date": "December 13th 2025",
+            "whitelists": [{
+              "name": "custom_whitelist",
+              "endpoints": [
+                {"domain": "github.com", "port": 443, "protocol": "TCP"},
+                {"domain": "api.github.com", "port": 443, "protocol": "TCP"}
+              ]
+            }]
+          }
+          EOF
+      
+      - name: Create cancellation script
+        run: |
+          # Create the cancellation script that flodviddar will call
+          ./scripts/create_cancel_script.sh
+          
+          echo "Verifying script was created..."
+          ls -la "$HOME/cancel_pipeline.sh"
+          
+          echo "Script contents:"
+          cat "$HOME/cancel_pipeline.sh"
+      
+      - name: Start flodviddar watch daemon
+        run: |
+          echo "Starting flodviddar watch daemon with cancellation enabled..."
+          
+          # Export environment variable so daemon can find the script
+          export FLODVIDDAR_CANCEL_SCRIPT="$HOME/cancel_pipeline.sh"
+          
+          # Start daemon in background with --no-cancel to prevent automatic cancellation
+          # (we want to test the script manually)
+          sudo -E ./target/release/flodviddar watch 10 \
+            --custom-whitelist whitelist.json \
+            --no-cancel \
+            > watch.log 2>&1 &
+          
+          DAEMON_PID=$!
+          echo "Daemon started (PID: $DAEMON_PID)"
+          echo "DAEMON_PID=$DAEMON_PID" >> $GITHUB_ENV
+          
+          sleep 10
+      
+      - name: Generate violation
+        run: |
+          echo "Generating violation (unauthorized connection to example.com)..."
+          curl -s --max-time 5 https://example.com > /dev/null || true
+          
+          echo "Waiting for daemon to detect violation..."
+          sleep 30
+      
+      - name: Test cancellation script manually
+        run: |
+          echo "Testing cancellation script manually..."
+          
+          # Run the script manually to verify it works
+          if bash "$HOME/cancel_pipeline.sh" "Test violation from flodviddar"; then
+            echo "[SUCCESS] Cancellation script executed successfully"
+          else
+            echo "[ERROR] Cancellation script failed"
+            exit 1
+          fi
+          
+          # Check log was created
+          LOGFILE="$HOME/cancel_pipeline_${{ github.run_id }}.log"
+          if [[ -f "$LOGFILE" ]]; then
+            echo "=== Cancellation Log ==="
+            cat "$LOGFILE"
+            
+            if grep -q "gh run cancel" "$LOGFILE"; then
+              echo "[SUCCESS] Script attempted to cancel pipeline"
+            else
+              echo "[ERROR] Script did not attempt cancellation"
+              exit 1
+            fi
+          else
+            echo "[ERROR] No log file created"
+            exit 1
+          fi
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          # Stop daemon
+          sudo pkill -f flodviddar || true
+          
+          # Show daemon logs
+          echo "=== Daemon Logs ==="
+          cat watch.log 2>/dev/null || echo "No daemon logs"
+

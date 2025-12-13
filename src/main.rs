@@ -412,7 +412,42 @@ async fn create_whitelist(seconds: u64, augment: bool, output_path: Option<&str>
 }
 
 /// Detects GitHub Actions or GitLab CI environment and attempts to cancel the current pipeline
-fn halt_ci_pipeline(_reason: &str) -> Result<()> {
+/// First checks for external cancellation script, then falls back to built-in logic
+fn halt_ci_pipeline(reason: &str) -> Result<()> {
+    use std::env;
+    use std::path::Path;
+    
+    // Check for custom cancellation script (most secure - no token passing needed)
+    let cancel_script_path = env::var("FLODVIDDAR_CANCEL_SCRIPT")
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            format!("{}/cancel_pipeline.sh", home)
+        });
+    
+    // Try external script first if it exists
+    if Path::new(&cancel_script_path).exists() {
+        println!("Using cancellation script: {}", cancel_script_path);
+        
+        let status = Command::new("bash")
+            .arg(&cancel_script_path)
+            .arg(reason)
+            .status();
+        
+        if let Ok(status) = status {
+            if status.success() {
+                println!("Pipeline cancelled successfully via script");
+                return Ok(());
+            } else {
+                eprintln!("Cancellation script failed (exit code: {:?})", status.code());
+            }
+        } else {
+            eprintln!("Failed to execute cancellation script");
+        }
+    } else {
+        println!("No cancellation script found at {}, using built-in logic", cancel_script_path);
+    }
+    
+    // Fallback to built-in cancellation logic
     // GitHub Actions detection
     if std::env::var("GITHUB_ACTIONS").is_ok() {
         if let (Ok(run_id), Ok(repo)) = (

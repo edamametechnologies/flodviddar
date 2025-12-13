@@ -126,6 +126,16 @@ main() {
         failed=$((failed + 1))
     fi
     
+    echo ""
+    echo "========================================"
+    
+    # Test 4: Cancellation Script
+    if run_test "Cancellation Script" "$SCRIPT_DIR/test_cancel_script.sh"; then
+        passed=$((passed + 1))
+    else
+        failed=$((failed + 1))
+    fi
+    
     # Summary
     echo ""
     echo "========================================"

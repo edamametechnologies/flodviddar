@@ -99,11 +99,27 @@ Manually cancel the current CI pipeline.
 flodviddar halt "reason"
 ```
 
-Detects GitHub Actions or GitLab CI environment and calls the appropriate API.
+Detects GitHub Actions or GitLab CI environment and calls the appropriate API. Supports external cancellation scripts via `FLODVIDDAR_CANCEL_SCRIPT` environment variable.
+
+**Cancellation Script:**
+
+Create a script at `$HOME/cancel_pipeline.sh` (or custom path via `FLODVIDDAR_CANCEL_SCRIPT`) to handle pipeline cancellation. Flodviddar will execute this script instead of using built-in logic.
+
+```bash
+# Create cancellation script
+./scripts/create_cancel_script.sh
+
+# Or manually
+export FLODVIDDAR_CANCEL_SCRIPT=/path/to/custom_script.sh
+```
+
+The script receives the violation reason as `$1` and should handle cancellation based on detected CI environment.
 
 ## CI/CD Integration
 
 ### GitHub Actions
+
+#### Basic Integration
 
 ```yaml
 jobs:
@@ -133,6 +149,41 @@ jobs:
             jq . violations.json
             exit 1
           fi
+```
+
+#### With Pipeline Cancellation
+
+For real-time cancellation when violations are detected:
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Required for gh run cancel
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Flodviddar
+        run: |
+          sudo apt-get install -y libpcap-dev
+          cargo build --release
+      
+      - name: Create cancellation script
+        run: ./scripts/create_cancel_script.sh
+      
+      - name: Start watch daemon
+        run: |
+          export FLODVIDDAR_CANCEL_SCRIPT="$HOME/cancel_pipeline.sh"
+          sudo -E ./target/release/flodviddar watch 10 \
+            --custom-whitelist whitelist.json \
+            > watch.log 2>&1 &
+          sleep 5
+      
+      - name: Build application
+        run: npm install && npm test
+      
+      # If violations occur, workflow will be cancelled before reaching here
 ```
 
 ### GitLab CI
