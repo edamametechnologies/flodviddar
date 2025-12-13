@@ -29,10 +29,16 @@ check_prerequisites() {
     log_info "Checking prerequisites..."
     
     local missing=0
+    local warnings=0
     
-    if ! command -v cargo &> /dev/null; then
-        log_error "cargo not found (Rust toolchain required)"
+    # Check if binary exists (from CI build or previous local build)
+    if [[ -f "$SCRIPT_DIR/../target/release/flodviddar" ]]; then
+        log_info "Flodviddar binary found (cargo not required)"
+    elif ! command -v cargo &> /dev/null; then
+        log_error "cargo not found and no pre-built binary available"
         missing=1
+    else
+        log_info "cargo available for building"
     fi
     
     if ! command -v python3 &> /dev/null; then
