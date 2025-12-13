@@ -1,0 +1,103 @@
+# Example GitHub Actions Workflow using Flodviddar
+# This demonstrates whitelist lifecycle management in GitHub Actions
+
+name: Flodviddar Security Check
+
+on: [push, pull_request]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Setup phase
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev jq bc python3-requests
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Build Flodviddar
+        run: |
+          cargo build --release
+          echo "FLODVIDDAR_BIN=$PWD/target/release/flodviddar" >> $GITHUB_ENV
+      
+      # Download previous whitelist (if exists)
+      - name: Download whitelist
+        uses: actions/download-artifact@v4
+        with:
+          name: flodviddar-whitelist
+          path: .
+        continue-on-error: true
+      
+      # Start monitoring BEFORE your build/test steps
+      - name: Start Flodviddar
+        run: |
+          if [[ -f "whitelist.json" ]]; then
+            echo "Using existing whitelist"
+            MODE="scan"
+          else
+            echo "No whitelist found, creating baseline"
+            MODE="learn"
+          fi
+          
+          # Start scan in background
+          sudo $FLODVIDDAR_BIN scan 300 \
+            $(if [[ -f "whitelist.json" ]]; then echo "--custom-whitelist whitelist.json"; fi) \
+            --output report \
+            > scan_report.json 2>&1 &
+          
+          echo "FLODVIDDAR_PID=$!" >> $GITHUB_ENV
+          sleep 5
+      
+      # YOUR BUILD/TEST STEPS HERE
+      - name: Build and Test
+        run: |
+          npm install
+          npm run build
+          npm test
+      
+      # Stop monitoring and check results
+      - name: Stop and Analyze
+        if: always()
+        run: |
+          # Capture is time-based, should auto-stop
+          # But we can create/augment whitelist from captured traffic
+          
+          if [[ -f "whitelist.json" ]]; then
+            # Augment existing whitelist
+            sudo $FLODVIDDAR_BIN create-whitelist 5 true --file whitelist.json
+          else
+            # Create new whitelist
+            sudo $FLODVIDDAR_BIN create-whitelist 5 false --file whitelist.json
+          fi
+          
+          # Display results
+          echo "=== Whitelist Status ==="
+          ENDPOINT_COUNT=$(jq '[.whitelists[]? | .endpoints? // [] | length] | add // 0' whitelist.json)
+          echo "Total endpoints: $ENDPOINT_COUNT"
+      
+      # Upload whitelist for next run
+      - name: Upload whitelist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flodviddar-whitelist
+          path: whitelist.json
+          retention-days: 90
+      
+      # Check for violations
+      - name: Check violations
+        if: always()
+        run: |
+          if [[ -f "scan_report.json" ]] && [[ $(jq 'length' scan_report.json) -gt 0 ]]; then
+            echo "WARNING: Whitelist violations detected"
+            jq -r '.[] | "\(.session.src_ip):\(.session.src_port) -> \(.dst_domain // .session.dst_ip):\(.session.dst_port)"' scan_report.json
+            exit 1
+          fi
+

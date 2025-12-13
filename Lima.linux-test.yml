@@ -1,0 +1,116 @@
+# Lima VM configuration for Flodviddar testing on macOS
+# Usage:
+#   limactl create --name=flodviddar-test Lima.linux-test.yml
+#   limactl start flodviddar-test
+#   limactl shell flodviddar-test
+#
+# Or use the Makefile targets:
+#   make lima-create
+#   make lima-start
+#   make lima-test
+#   make lima-stop
+#   make lima-delete
+
+images:
+- location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+  arch: "x86_64"
+- location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+  arch: "aarch64"
+
+cpus: 4
+memory: "8GiB"
+disk: "50GiB"
+
+mounts:
+- location: "~"
+  writable: true
+- location: "/tmp/lima"
+  writable: true
+
+provision:
+- mode: system
+  script: |
+    set -eux
+    
+    # Update package list
+    apt-get update
+    
+    # Install build essentials
+    apt-get install -y \
+      build-essential \
+      pkg-config \
+      curl \
+      wget \
+      git \
+      jq \
+      bc
+    
+    # Install eBPF development tools
+    apt-get install -y \
+      clang \
+      llvm \
+      libelf-dev \
+      zlib1g-dev \
+      libbpf-dev \
+      linux-headers-$(uname -r) \
+      linux-tools-$(uname -r) \
+      linux-tools-common \
+      bpfcc-tools
+    
+    # Install libpcap for packet capture
+    apt-get install -y libpcap-dev
+    
+    # Install Python for tests
+    apt-get install -y python3 python3-pip
+    pip3 install requests
+    
+    # Install protobuf compiler
+    apt-get install -y protobuf-compiler
+    
+    # Install GitHub CLI for workflow testing
+    mkdir -p -m 755 /etc/apt/keyrings
+    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    apt-get update
+    apt-get install -y gh
+    
+    # Configure kernel for eBPF
+    sysctl -w kernel.perf_event_paranoid=-1
+    sysctl -w kernel.unprivileged_bpf_disabled=0
+    sysctl -w net.core.bpf_jit_enable=1 || true
+    
+    # Make kernel settings persistent
+    cat >> /etc/sysctl.d/99-ebpf.conf << 'EOF'
+    kernel.perf_event_paranoid=-1
+    kernel.unprivileged_bpf_disabled=0
+    net.core.bpf_jit_enable=1
+    EOF
+    
+    # Mount debugfs and bpffs
+    mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+    mount -t bpf none /sys/fs/bpf 2>/dev/null || true
+    
+    # Add mounts to fstab
+    grep -q debugfs /etc/fstab || echo "debugfs /sys/kernel/debug debugfs defaults 0 0" >> /etc/fstab
+    grep -q bpf /etc/fstab || echo "bpf /sys/fs/bpf bpf defaults 0 0" >> /etc/fstab
+    
+    # Install Rust for the lima user
+    sudo -u $(id -un 1000) bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
+    
+    echo "Flodviddar test environment setup complete!"
+    echo "Kernel version: $(uname -r)"
+    echo "Clang version: $(clang --version | head -1)"
+
+message: |
+  Flodviddar test VM is ready!
+  
+  To run tests:
+    limactl shell flodviddar-test
+    cd ~/Programming/flodviddar
+    source $HOME/.cargo/env
+    make test
+  
+  Or from macOS:
+    make lima-test
+

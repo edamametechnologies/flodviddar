@@ -1,0 +1,108 @@
+name: Test Flodviddar
+
+on:
+  push:
+    branches: ['main', 'dev']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-lifecycle:
+    name: Whitelist Lifecycle Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev jq bc python3-pip
+          pip3 install requests
+      
+      - name: Build flodviddar
+        run: cargo build --release
+      
+      - name: Verify eBPF support
+        run: ./tests/verify_ebpf.sh
+      
+      - name: Run lifecycle test
+        run: sudo ./tests/test_whitelist_lifecycle.sh
+  
+  test-cve:
+    name: CVE-2025-30066 Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev jq bc python3-pip
+          pip3 install requests
+      
+      - name: Build flodviddar
+        run: cargo build --release
+      
+      - name: Run CVE detection test
+        run: sudo ./tests/test_cve_2025_30066.sh
+  
+  test-watch:
+    name: Watch Daemon Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev jq bc python3-pip
+          pip3 install requests
+      
+      - name: Build flodviddar
+        run: cargo build --release
+      
+      - name: Run watch daemon test
+        run: sudo ./tests/test_watch_daemon.sh
+  
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+      
+      - name: Run unit tests
+        run: cargo test --verbose
+
