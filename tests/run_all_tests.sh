@@ -97,9 +97,9 @@ main() {
     
     # Test 1: Whitelist Lifecycle
     if run_test "Whitelist Lifecycle" "$SCRIPT_DIR/test_whitelist_lifecycle.sh"; then
-        ((passed++))
+        passed=$((passed + 1))
     else
-        ((failed++))
+        failed=$((failed + 1))
     fi
     
     echo ""
@@ -107,9 +107,9 @@ main() {
     
     # Test 2: CVE-2025-30066 Detection
     if run_test "CVE-2025-30066 Detection" "$SCRIPT_DIR/test_cve_2025_30066.sh"; then
-        ((passed++))
+        passed=$((passed + 1))
     else
-        ((failed++))
+        failed=$((failed + 1))
     fi
     
     echo ""
@@ -117,9 +117,9 @@ main() {
     
     # Test 3: Watch Daemon
     if run_test "Watch Daemon" "$SCRIPT_DIR/test_watch_daemon.sh"; then
-        ((passed++))
+        passed=$((passed + 1))
     else
-        ((failed++))
+        failed=$((failed + 1))
     fi
     
     # Summary
