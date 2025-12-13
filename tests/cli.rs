@@ -1,10 +1,9 @@
-use assert_cmd::cargo::CommandCargoExt;
+use assert_cmd::Command;
 use predicates::str::contains;
-use std::process::Command;
 
 #[test]
 fn help_displays() {
-    let mut cmd = Command::cargo_bin("flodviddar").expect("binary");
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_flodviddar"));
     cmd.arg("--help")
         .assert()
         .success()
