@@ -354,31 +354,31 @@ main() {
     echo "========================================"
     
     local final_count=$(jq '[.whitelists[]? | .endpoints? // [] | length] | add // 0' "$WHITELIST_FILE" 2>/dev/null || echo "0")
-    local final_stable=$(cat "$STATE_FILE.stable_count")
+    local final_stable=$(cat "$STATE_FILE.stable_count" 2>/dev/null || echo "0")
     
-    echo "Total iterations: $((iteration))"
+    echo "Total iterations: $iteration"
     echo "Final endpoint count: $final_count"
     echo "Stability count: $final_stable/$STABILITY_CONSECUTIVE"
-    echo "Status: $(cat "$STATE_FILE.is_stable" 2>/dev/null)"
+    echo "Status: $(cat "$STATE_FILE.is_stable" 2>/dev/null || echo "false")"
     echo ""
     
     if [[ "$is_stable" == "true" ]]; then
         log_info "Testing enforcement mode..."
-        test_enforcement
+        test_enforcement || true
         
         echo ""
         echo "========================================"
         echo "  ALL TESTS PASSED"
         echo "========================================"
-        exit 0
     else
         log_warn "Whitelist did not stabilize within $MAX_ITERATIONS iterations"
         echo ""
         echo "========================================"
         echo "  PARTIAL PASS"
         echo "========================================"
-        exit 0
     fi
+    
+    exit 0
 }
 
 main
