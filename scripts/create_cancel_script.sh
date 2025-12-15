@@ -102,3 +102,4 @@ chmod 700 "$CANCEL_SCRIPT_PATH"
 echo "[OK] Cancellation script created and ready"
 echo "Path: $CANCEL_SCRIPT_PATH"
 
+
