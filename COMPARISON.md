@@ -20,7 +20,7 @@ Comparison between Flodviddar (open-source) and EDAMAME Posture (proprietary).
 | **Pipeline cancellation** | ✓ | ✓ |
 | **Security posture assessment** | - | ✓ |
 | **Auto-remediation** | - | ✓ |
-| **Centralized management** | - | ✓ (Hub) |
+| **Centralized management** | - | ✓ (EDAMAME Hub) |
 | **Automated whitelist lifecycle** | Manual | ✓ |
 | **CI integration** | Bash scripts | GitHub Action |
 
@@ -30,7 +30,7 @@ Comparison between Flodviddar (open-source) and EDAMAME Posture (proprietary).
 
 ```bash
 # Simple 3-line integration
-sudo flodviddar create-whitelist 120 --file whitelist.json &
+sudo flodviddar create-whitelist 120 false --file whitelist.json &
 npm install && npm test
 wait && sudo flodviddar scan 30 --custom-whitelist whitelist.json
 ```
@@ -60,7 +60,7 @@ wait && sudo flodviddar scan 30 --custom-whitelist whitelist.json
 
 ### Choose Flodviddar
 
-- You need open-source with code visibility
+- You need open-source tooling with code visibility
 - You want bash integration without platform lock-in
 - You only need network monitoring
 - You prefer manual control
@@ -85,6 +85,6 @@ Both tools use the same whitelist JSON format and share the underlying Flodbadd 
 
 ## Links
 
-- **Flodviddar:** https://github.com/edamametechnologies/flodviddar
-- **EDAMAME Posture:** https://github.com/edamametechnologies/edamame_posture_cli
-- **EDAMAME Hub:** https://hub.edamame.tech
+- **Flodviddar:** [github.com/edamametechnologies/flodviddar](https://github.com/edamametechnologies/flodviddar)
+- **EDAMAME Posture:** [github.com/edamametechnologies/edamame_posture_cli](https://github.com/edamametechnologies/edamame_posture_cli)
+- **EDAMAME Hub:** [hub.edamame.tech](https://hub.edamame.tech)

@@ -7,7 +7,7 @@ Open-source CI/CD egress traffic monitor and supply chain attack detector.
 Flodviddar monitors outbound network connections from CI/CD pipelines to detect and prevent supply chain attacks. It enforces strict traffic whitelists, blocks known malicious destinations, and uses machine learning to identify anomalous behavior.
 
 **Key capabilities:**
-- Whitelist enforcement from L3 to L7 (IP, domain, port, protocol, ASN, process)
+- Whitelist enforcement (L3–L7: IP, domain, port, protocol, ASN, process)
 - Real-time blacklist matching against threat intelligence
 - ML-based anomaly detection for unknown threats
 - Automatic pipeline cancellation on violations
@@ -286,7 +286,7 @@ See `ARCHITECTURE.md` for implementation details.
 
 ## Relation to EDAMAME Posture
 
-Flodviddar provides a focused, open-source alternative to [EDAMAME Posture's](https://github.com/edamametechnologies/edamame_posture_cli) network monitoring capabilities. Both tools:
+Flodviddar provides a focused, open-source alternative to the network monitoring capabilities of [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture_cli). Both tools:
 
 - Use the same Flodbadd library for packet capture
 - Share the same whitelist/blacklist JSON format
@@ -316,6 +316,7 @@ Flodviddar provides a focused, open-source alternative to [EDAMAME Posture's](ht
 - You need enterprise support
 
 Both tools can be used together - Flodviddar for network monitoring in open-source projects, EDAMAME Posture for comprehensive security in enterprise environments.
+Both tools can be used together—Flodviddar for network monitoring in open-source projects, and EDAMAME Posture for comprehensive security in enterprise environments.
 
 ## Use Cases
 
@@ -385,11 +386,11 @@ MIT License - see LICENSE file for details.
 **EDAMAME Ecosystem:**
 - [EDAMAME Security](https://github.com/edamametechnologies/edamame_security) - Desktop security application
 - [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture_cli) - CLI for complete security posture
-- [EDAMAME Posture Action](https://github.com/edamametechnologies/edamame_posture_action) - GitHub Action
+- [EDAMAME Posture GitHub Action](https://github.com/edamametechnologies/edamame_posture_action) - GitHub Action wrapper
 - [Flodbadd](https://github.com/edamametechnologies/flodbadd) - Network visibility library
 - [Threat Models](https://github.com/edamametechnologies/threatmodels) - Security benchmarks database
 - [EDAMAME Hub](https://hub.edamame.tech) - Centralized management platform
 
 **Support:**
 - Flodviddar: GitHub issues
-- EDAMAME Posture: support@edamame.tech
+- EDAMAME Posture: [support@edamame.tech](mailto:support@edamame.tech)
