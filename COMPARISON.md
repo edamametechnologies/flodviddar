@@ -44,7 +44,7 @@ wait && sudo flodviddar scan 30 --custom-whitelist whitelist.json
 ### EDAMAME Posture (GitHub Action)
 
 ```yaml
-- uses: edamametechnologies/edamame_posture_action@v0
+- uses: edamametechnologies/edamame_posture_action@v1
   with:
     auto_whitelist: true
     network_scan: true
