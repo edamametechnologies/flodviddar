@@ -389,8 +389,6 @@ MIT License - see LICENSE file for details.
 - [EDAMAME Posture GitHub Action](https://github.com/edamametechnologies/edamame_posture_action) - GitHub Action wrapper
 - [Flodbadd](https://github.com/edamametechnologies/flodbadd) - Network visibility library
 - [Threat Models](https://github.com/edamametechnologies/threatmodels) - Security benchmarks database
-- [EDAMAME Hub](https://hub.edamame.tech) - Centralized management platform
-
-**Support:**
+- [EDAMAME Hub](https://hub.edamame.tech) - Centralized management platform**Support:**
 - Flodviddar: GitHub issues
 - EDAMAME Posture: [support@edamame.tech](mailto:support@edamame.tech)
