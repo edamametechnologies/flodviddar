@@ -381,9 +381,7 @@ See `CONTRIBUTING.md` for guidelines.
 
 MIT License - see LICENSE file for details.
 
-## Related Projects
-
-**EDAMAME Ecosystem:**
+## Related Projects**EDAMAME Ecosystem:**
 - [EDAMAME Security](https://github.com/edamametechnologies/edamame_security) - Desktop security application
 - [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture_cli) - CLI for complete security posture
 - [EDAMAME Posture GitHub Action](https://github.com/edamametechnologies/edamame_posture_action) - GitHub Action wrapper
