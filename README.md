@@ -379,7 +379,7 @@ See `CONTRIBUTING.md` for guidelines.
 
 ## License
 
-MIT License - see LICENSE file for details.
+Apache License 2.0 - see LICENSE file for details.
 
 ## Related Projects**EDAMAME Ecosystem:**
 - [EDAMAME Security](https://github.com/edamametechnologies/edamame_security) - Desktop security application
