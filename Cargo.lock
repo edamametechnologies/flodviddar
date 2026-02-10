@@ -912,7 +912,7 @@ checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
 [[package]]
 name = "edamame_backend"
 version = "0.3.5"
-source = "git+https://github.com/edamametechnologies/edamame_backend.git?branch=main#5ee4d19202d3779e7831108222708115618d4e52"
+source = "git+https://github.com/edamametechnologies/edamame_backend.git?branch=main#02b89b39bd80e6404f506a1367cf64e44e28766b"
 dependencies = [
  "anyhow",
  "blake3",
@@ -926,7 +926,7 @@ dependencies = [
 [[package]]
 name = "edamame_models"
 version = "0.1.1"
-source = "git+https://github.com/edamametechnologies/threatmodels-rs?branch=main#de9ed04a0e1ec34e420cacae0f05eb9bd4787329"
+source = "git+https://github.com/edamametechnologies/threatmodels-rs?branch=main#3bcd2706bc0ed008c75101d47d57ca6513417157"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1125,8 +1125,8 @@ dependencies = [
 
 [[package]]
 name = "flodbadd"
-version = "1.0.1"
-source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#d9f411e4d2a643f5bb537f27e36e37a95c7edfd9"
+version = "1.0.3"
+source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#77c2f44dd97ab3d9f53c852ce7c02e8cd80de34f"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1839,7 +1839,7 @@ dependencies = [
 [[package]]
 name = "l7_ebpf_program"
 version = "0.1.0"
-source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#d9f411e4d2a643f5bb537f27e36e37a95c7edfd9"
+source = "git+https://github.com/edamametechnologies/flodbadd?branch=main#77c2f44dd97ab3d9f53c852ce7c02e8cd80de34f"
 
 [[package]]
 name = "lazy_static"
@@ -3585,8 +3585,8 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "undeadlock"
-version = "1.0.0"
-source = "git+https://github.com/edamametechnologies/undeadlock?branch=main#f862dffbbcf40a4e8500b8bc1f8ff13145f2f4fc"
+version = "1.0.2"
+source = "git+https://github.com/edamametechnologies/undeadlock?branch=main#7860781c841c24f1be671cc39cd5bdbabb7d8ec0"
 dependencies = [
  "dashmap",
  "futures",
