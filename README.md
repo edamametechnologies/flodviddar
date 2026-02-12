@@ -373,9 +373,7 @@ cargo fmt
 cargo clippy
 cargo test
 sudo ./tests/run_all_tests.sh
-```
-
-See `CONTRIBUTING.md` for guidelines.
+```See `CONTRIBUTING.md` for guidelines.
 ## LicenseApache License 2.0 - see LICENSE file for details.
 ## Related Projects
 **EDAMAME Ecosystem:**
