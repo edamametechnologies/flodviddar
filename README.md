@@ -373,8 +373,14 @@ cargo fmt
 cargo clippy
 cargo test
 sudo ./tests/run_all_tests.sh
-```See `CONTRIBUTING.md` for guidelines.
-## LicenseApache License 2.0 - see LICENSE file for details.
+```
+
+See `CONTRIBUTING.md` for guidelines.
+
+## License
+
+Apache License 2.0 - see LICENSE file for details.
+
 ## Related Projects
 **EDAMAME Ecosystem:**
 - [EDAMAME Security](https://github.com/edamametechnologies/edamame_security) - Desktop security application
