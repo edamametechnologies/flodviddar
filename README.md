@@ -286,7 +286,7 @@ See `ARCHITECTURE.md` for implementation details.
 
 ## Relation to EDAMAME Posture
 
-Flodviddar provides a focused, open-source alternative to the network monitoring capabilities of [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture_cli). Both tools:
+Flodviddar provides a focused, open-source alternative to the network monitoring capabilities of [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture). Both tools:
 
 - Use the same Flodbadd library for packet capture
 - Share the same whitelist/blacklist JSON format
@@ -315,7 +315,6 @@ Flodviddar provides a focused, open-source alternative to the network monitoring
 - You require auto-remediation capabilities
 - You need enterprise support
 
-Both tools can be used together - Flodviddar for network monitoring in open-source projects, EDAMAME Posture for comprehensive security in enterprise environments.
 Both tools can be used together—Flodviddar for network monitoring in open-source projects, and EDAMAME Posture for comprehensive security in enterprise environments.
 
 ## Use Cases
@@ -384,10 +383,12 @@ Apache License 2.0 - see LICENSE file for details.
 ## Related Projects
 **EDAMAME Ecosystem:**
 - [EDAMAME Security](https://github.com/edamametechnologies/edamame_security) - Desktop security application
-- [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture_cli) - CLI for complete security posture
+- [EDAMAME Posture](https://github.com/edamametechnologies/edamame_posture) - CLI for complete security posture
 - [EDAMAME Posture GitHub Action](https://github.com/edamametechnologies/edamame_posture_action) - GitHub Action wrapper
 - [Flodbadd](https://github.com/edamametechnologies/flodbadd) - Network visibility library
 - [Threat Models](https://github.com/edamametechnologies/threatmodels) - Security benchmarks database
-- [EDAMAME Hub](https://hub.edamame.tech) - Centralized management platform**Support:**
+- [EDAMAME Hub](https://hub.edamame.tech) - Centralized management platform
+
+**Support:**
 - Flodviddar: GitHub issues
 - EDAMAME Posture: [support@edamame.tech](mailto:support@edamame.tech)
