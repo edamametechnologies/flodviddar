@@ -14,10 +14,19 @@ default = ["packetcapture"]
 packetcapture = ["flodbadd/packetcapture"]
 
 [dependencies]
-# Enable eBPF for Linux targets - provides high-performance L7 process resolution
 # Local copy in order to allow rapid development/debug
-#flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture", "ebpf" ] }
-flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture", "ebpf" ] }
+flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture" ] }
+#flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture" ] }
+
+# eBPF for 64-bit Linux targets
+[target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
+flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture", "ebpf" ] }
+#flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture", "ebpf" ] }
+
+# Endpoint Security for macOS
+[target.'cfg(target_os = "macos")'.dependencies]
+flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture", "endpointsecurity" ] }
+#flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture", "endpointsecurity" ] }
 
 clap = { version = "4.5", features = ["derive"] }
 tracing = "0.1"
