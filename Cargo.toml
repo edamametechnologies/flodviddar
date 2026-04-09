@@ -15,8 +15,8 @@ packetcapture = ["flodbadd/packetcapture"]
 
 [dependencies]
 # Local copy in order to allow rapid development/debug
-flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture" ] }
-#flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture" ] }
+#flodbadd = { path = "../flodbadd", features = [ "packetcapture", "asyncpacketcapture" ] }
+flodbadd = { git = "https://github.com/edamametechnologies/flodbadd", branch = "main", features = [ "packetcapture", "asyncpacketcapture" ] }
 
 # eBPF for 64-bit Linux targets
 [target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
